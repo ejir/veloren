@@ -163,6 +163,10 @@ val verifyReleaseSigning = tasks.register("verifyReleaseSigning") {
     }
 }
 
-tasks.named("preReleaseBuild").configure {
+// AGP registers per-variant lifecycle tasks (preReleaseBuild, assembleRelease,
+// ...) only after this script is evaluated, so an eager tasks.named(...)
+// lookup fails configuration with UnknownTaskException. matching() returns a
+// live view and configureEach() fires once AGP adds the task.
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
     dependsOn(verifyReleaseSigning)
 }
