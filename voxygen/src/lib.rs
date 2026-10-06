@@ -12,6 +12,8 @@
 #[macro_use]
 pub mod ui;
 pub mod audio;
+#[cfg(target_os = "android")]
+mod android_log;
 pub mod app;
 pub mod cli;
 pub mod cmd;
@@ -40,6 +42,10 @@ pub mod window;
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub fn android_main(app: winit::platform::android::activity::AndroidApp) {
+    // Install logcat reporting before anything else: native stdout/stderr are
+    // invisible on Android, so without this startup panics would be silent.
+    crate::android_log::install_panic_hook();
+    crate::android_log::stage("android_main entered");
     crate::app::run(&app);
 }
 

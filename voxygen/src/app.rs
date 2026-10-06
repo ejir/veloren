@@ -44,8 +44,15 @@ pub fn run(
 ) {
     #[cfg(target_os = "android")]
     initialize_android_storage(android_app);
+    #[cfg(target_os = "android")]
+    crate::android_log::stage("android storage ready");
 
-    // Process CLI arguments
+    // Process CLI arguments. On Android the process argv comes from the system
+    // and carries no user arguments; parse a fixed argv so unexpected entries
+    // can never abort startup with a clap usage error.
+    #[cfg(target_os = "android")]
+    let args = cli::Args::try_parse_from(["voxygen"]).expect("empty argv must parse");
+    #[cfg(not(target_os = "android"))]
     let args = cli::Args::parse();
 
     if let Some(command) = args.command {
@@ -73,6 +80,9 @@ pub fn run(
             },
         }
     }
+
+    #[cfg(target_os = "android")]
+    crate::android_log::stage("cli args parsed");
 
     #[cfg(feature = "tracy")]
     common_base::tracy_client::Client::start();
@@ -182,8 +192,12 @@ pub fn run(
             LocalizationHandle::load_expect(&settings.language.selected_language)
         });
     i18n.set_english_fallback(settings.language.use_english_fallback);
+    #[cfg(target_os = "android")]
+    crate::android_log::stage("i18n ready");
 
     // Create window
+    #[cfg(target_os = "android")]
+    crate::android_log::stage("creating window");
     #[cfg(target_os = "android")]
     let window_result = Window::new(&settings, &tokio_runtime, android_app);
     #[cfg(not(target_os = "android"))]
@@ -211,6 +225,9 @@ pub fn run(
         },
         Err(error) => panic!("Failed to create window!: {:?}", error),
     };
+
+    #[cfg(target_os = "android")]
+    crate::android_log::stage("window created");
 
     let clipboard = crate::ui::ice::Clipboard::connect(window.window());
 
@@ -250,6 +267,9 @@ pub fn run(
         discord,
         args: args.clone(),
     };
+
+    #[cfg(target_os = "android")]
+    crate::android_log::stage("entering main loop");
 
     run::run(global_state, event_loop).unwrap();
 }
@@ -303,6 +323,7 @@ fn initialize_android_storage(app: &winit::platform::android::activity::AndroidA
             .is_ok_and(|canary| canary.starts_with("VELOREN_CANARY_MAGIC"));
 
     if !assets_are_current {
+        crate::android_log::stage("extracting bundled assets (first launch, may take minutes)");
         // Rebuild into a staging directory so a killed process never leaves a
         // marker that would make a partial extraction look complete. Remove the
         // previous copy first to avoid requiring another ~450 MB of free space.
