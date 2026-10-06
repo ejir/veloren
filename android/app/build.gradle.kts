@@ -150,6 +150,27 @@ val buildRustAndroid = tasks.register<Exec>("buildRustAndroid") {
             "--features", "android",
         )
     }
+
+    doLast {
+        // The Rust cdylib links the NDK's shared C++ runtime (shaderc and
+        // other native code are C++). Android does not provide
+        // libc++_shared.so on device, so the NDK prebuilt must be packaged
+        // next to our library or dlopen fails with UnsatisfiedLinkError.
+        val osName = System.getProperty("os.name").lowercase()
+        val hostTag = when {
+            "linux" in osName -> "linux-x86_64"
+            "mac" in osName -> "darwin-x86_64"
+            "windows" in osName -> "windows-x86_64"
+            else -> error("Unsupported host OS for NDK prebuilt lookup: $osName")
+        }
+        val stl = android.ndkDirectory.resolve(
+            "toolchains/llvm/prebuilt/$hostTag/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so",
+        )
+        check(stl.isFile) { "NDK libc++_shared.so not found: ${stl.absolutePath}" }
+        val abiDir = outputDirectory.resolve("arm64-v8a")
+        abiDir.mkdirs()
+        stl.copyTo(abiDir.resolve("libc++_shared.so"), overwrite = true)
+    }
 }
 
 tasks.named("preBuild").configure {
