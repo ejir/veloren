@@ -42,10 +42,20 @@ pub mod window;
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub fn android_main(app: winit::platform::android::activity::AndroidApp) {
+    // Point TLS certificate discovery at the Android system CA store before anything else
+    // runs. Neither rustls-native-certs (used by hyper-rustls/authc and
+    // rustls-platform-verifier) nor openssl-probe knows the Android trust store location,
+    // but SSL_CERT_DIR is honored and every file in the directory is tried.
+    // SAFETY: no other Rust threads exist yet and nothing else in the process touches the
+    // environment concurrently this early in startup.
+    unsafe {
+        std::env::set_var("SSL_CERT_DIR", "/system/etc/security/cacerts");
+    }
     // Install logcat reporting before anything else: native stdout/stderr are
     // invisible on Android, so without this startup panics would be silent.
     crate::android_log::install_panic_hook();
     crate::android_log::stage("android_main entered");
+    crate::android_log::stage("SSL_CERT_DIR pointed at system CA store");
     crate::app::run(&app);
 }
 
