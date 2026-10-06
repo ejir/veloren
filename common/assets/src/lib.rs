@@ -3,6 +3,8 @@
 
 use image::DynamicImage;
 use lazy_static::lazy_static;
+#[cfg(target_os = "android")]
+use std::sync::OnceLock;
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -10,8 +12,6 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
-#[cfg(target_os = "android")]
-use std::sync::OnceLock;
 
 pub use assets_manager::{
     Asset, AssetCache, BoxedError, Error, FileAsset, SharedString,
@@ -25,9 +25,7 @@ static ANDROID_ASSETS_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 /// Set the extracted, read-only game asset directory before loading any assets.
 #[cfg(target_os = "android")]
-pub fn set_android_assets_path(path: PathBuf) {
-    let _ = ANDROID_ASSETS_PATH.set(path);
-}
+pub fn set_android_assets_path(path: PathBuf) { let _ = ANDROID_ASSETS_PATH.set(path); }
 
 #[cfg(feature = "plugins")] mod plugin_cache;
 mod walk;

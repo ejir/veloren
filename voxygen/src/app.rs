@@ -1,7 +1,7 @@
 //! Shared Voxygen bootstrap for desktop builds and the Android NativeActivity.
 
-use clap::Parser;
-use i18n::{self, LocalizationHandle};
+#[cfg(feature = "singleplayer")]
+use crate::singleplayer::SingleplayerState;
 use crate::{
     GlobalState,
     audio::AudioFrontend,
@@ -15,28 +15,28 @@ use crate::{
     settings::{AudioOutput, Settings, get_fps},
     window::Window,
 };
-#[cfg(feature = "singleplayer")]
-use crate::singleplayer::SingleplayerState;
+use clap::Parser;
+use i18n::{self, LocalizationHandle};
 
+#[cfg(feature = "egui-ui")]
+use crate::ui::egui::EguiState;
 use chrono::Utc;
 use common::{clock::Clock, consts::MIN_RECOMMENDED_TOKIO_THREADS};
-use std::{
-    path::PathBuf,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
-use tokio::runtime::Builder;
 #[cfg(target_os = "android")]
 use std::{
     ffi::CString,
     io::{self, Read},
     path::{Component, Path},
 };
+use std::{
+    path::PathBuf,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+};
+use tokio::runtime::Builder;
 use tracing::{info, warn};
-#[cfg(feature = "egui-ui")]
-use crate::ui::egui::EguiState;
 use wgpu::{Backends, Instance};
 
 pub fn run(
@@ -44,8 +44,15 @@ pub fn run(
 ) {
     #[cfg(target_os = "android")]
     initialize_android_storage(android_app);
+    #[cfg(target_os = "android")]
+    crate::android_log::stage("android storage ready");
 
-    // Process CLI arguments
+    // Process CLI arguments. On Android the process argv comes from the system
+    // and carries no user arguments; parse a fixed argv so unexpected entries
+    // can never abort startup with a clap usage error.
+    #[cfg(target_os = "android")]
+    let args = cli::Args::try_parse_from(["voxygen"]).expect("empty argv must parse");
+    #[cfg(not(target_os = "android"))]
     let args = cli::Args::parse();
 
     if let Some(command) = args.command {
@@ -73,6 +80,9 @@ pub fn run(
             },
         }
     }
+
+    #[cfg(target_os = "android")]
+    crate::android_log::stage("cli args parsed");
 
     #[cfg(feature = "tracy")]
     common_base::tracy_client::Client::start();
@@ -182,8 +192,12 @@ pub fn run(
             LocalizationHandle::load_expect(&settings.language.selected_language)
         });
     i18n.set_english_fallback(settings.language.use_english_fallback);
+    #[cfg(target_os = "android")]
+    crate::android_log::stage("i18n ready");
 
     // Create window
+    #[cfg(target_os = "android")]
+    crate::android_log::stage("creating window");
     #[cfg(target_os = "android")]
     let window_result = Window::new(&settings, &tokio_runtime, android_app);
     #[cfg(not(target_os = "android"))]
@@ -211,6 +225,9 @@ pub fn run(
         },
         Err(error) => panic!("Failed to create window!: {:?}", error),
     };
+
+    #[cfg(target_os = "android")]
+    crate::android_log::stage("window created");
 
     let clipboard = crate::ui::ice::Clipboard::connect(window.window());
 
@@ -250,6 +267,9 @@ pub fn run(
         discord,
         args: args.clone(),
     };
+
+    #[cfg(target_os = "android")]
+    crate::android_log::stage("entering main loop");
 
     run::run(global_state, event_loop).unwrap();
 }
@@ -303,6 +323,7 @@ fn initialize_android_storage(app: &winit::platform::android::activity::AndroidA
             .is_ok_and(|canary| canary.starts_with("VELOREN_CANARY_MAGIC"));
 
     if !assets_are_current {
+        crate::android_log::stage("extracting bundled assets (first launch, may take minutes)");
         // Rebuild into a staging directory so a killed process never leaves a
         // marker that would make a partial extraction look complete. Remove the
         // previous copy first to avoid requiring another ~450 MB of free space.
@@ -312,8 +333,7 @@ fn initialize_android_storage(app: &winit::platform::android::activity::AndroidA
                 .expect("failed to remove an incomplete Android asset extraction");
         }
         if assets_dir.exists() {
-            std::fs::remove_dir_all(&assets_dir)
-                .expect("failed to remove outdated Android assets");
+            std::fs::remove_dir_all(&assets_dir).expect("failed to remove outdated Android assets");
         }
         std::fs::create_dir_all(&staging_dir)
             .expect("failed to create Android asset extraction directory");
@@ -339,13 +359,16 @@ fn initialize_android_storage(app: &winit::platform::android::activity::AndroidA
                 .unwrap_or_else(|| panic!("missing Veloren asset in APK: {apk_path}"));
             let destination = staging_dir.join(relative);
             if let Some(parent) = destination.parent() {
-                std::fs::create_dir_all(parent)
-                    .unwrap_or_else(|error| panic!("failed to create {}: {error}", parent.display()));
+                std::fs::create_dir_all(parent).unwrap_or_else(|error| {
+                    panic!("failed to create {}: {error}", parent.display())
+                });
             }
-            let mut output = std::fs::File::create(&destination)
-                .unwrap_or_else(|error| panic!("failed to create {}: {error}", destination.display()));
-            io::copy(&mut asset, &mut output)
-                .unwrap_or_else(|error| panic!("failed to extract {}: {error}", destination.display()));
+            let mut output = std::fs::File::create(&destination).unwrap_or_else(|error| {
+                panic!("failed to create {}: {error}", destination.display())
+            });
+            io::copy(&mut asset, &mut output).unwrap_or_else(|error| {
+                panic!("failed to extract {}: {error}", destination.display())
+            });
         }
 
         let extracted_canary = std::fs::read_to_string(staging_dir.join("common/canary.canary"))
@@ -360,8 +383,7 @@ fn initialize_android_storage(app: &winit::platform::android::activity::AndroidA
     }
 
     let userdata_dir = app_data_dir.join("userdata");
-    std::fs::create_dir_all(&userdata_dir)
-        .expect("failed to create Android user data directory");
+    std::fs::create_dir_all(&userdata_dir).expect("failed to create Android user data directory");
     common_base::set_android_userdata_dir(userdata_dir);
     common::assets::set_android_assets_path(assets_dir);
 }

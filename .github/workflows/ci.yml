@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+  pull-requests: write # TEMP-DEBUG: remove with the failure-report steps
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain with rustfmt
+        shell: bash
+        run: |
+          toolchain="$(tr -d '\r\n' < rust-toolchain)"
+          rustup toolchain install "$toolchain" --profile minimal
+          rustup component add rustfmt --toolchain "$toolchain"
+          rustup show active-toolchain
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo fmt --all -- --check 2>&1 | tee /tmp/fmt.log
+      # TEMP-DEBUG: remove once CI is green (sandbox cannot fetch Actions logs)
+      - name: Post failure log to PR
+        if: failure() && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## TEMP-DEBUG CI failure: ${{ github.job }} (run ${{ github.run_id }})"
+            echo ""
+            echo '```text'
+            tail -c 30000 /tmp/fmt.log
+            echo '```'
+          } > /tmp/report.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/report.md
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install system build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev \
+            libudev-dev \
+            mold \
+            pkg-config
+
+      - name: Install pinned Rust toolchain with clippy
+        shell: bash
+        run: |
+          toolchain="$(tr -d '\r\n' < rust-toolchain)"
+          rustup toolchain install "$toolchain" --profile minimal
+          rustup component add clippy --toolchain "$toolchain"
+          rustup show active-toolchain
+
+      - name: Cache Rust build output
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-clippy
+
+      - name: Run clippy on the whole workspace
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy --locked --workspace --all-targets -- -D warnings 2>&1 | tee /tmp/clippy.log
+      # TEMP-DEBUG: remove once CI is green (sandbox cannot fetch Actions logs)
+      - name: Post failure log to PR
+        if: failure() && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## TEMP-DEBUG CI failure: ${{ github.job }} (run ${{ github.run_id }})"
+            echo ""
+            echo '```text'
+            tail -c 30000 /tmp/clippy.log
+            echo '```'
+          } > /tmp/report.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/report.md
+
+  check:
+    name: Check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install system build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev \
+            libudev-dev \
+            mold \
+            pkg-config
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          toolchain="$(tr -d '\r\n' < rust-toolchain)"
+          rustup toolchain install "$toolchain" --profile minimal
+          rustup show active-toolchain
+
+      - name: Cache Rust build output
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-check
+
+      - name: Check the whole workspace
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo check --locked --workspace --all-targets 2>&1 | tee /tmp/check.log
+      # TEMP-DEBUG: remove once CI is green (sandbox cannot fetch Actions logs)
+      - name: Post failure log to PR
+        if: failure() && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## TEMP-DEBUG CI failure: ${{ github.job }} (run ${{ github.run_id }})"
+            echo ""
+            echo '```text'
+            tail -c 30000 /tmp/check.log
+            echo '```'
+          } > /tmp/report.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/report.md

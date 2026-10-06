@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sampled from the blue field of Veloren's logo so the adaptive-icon
+         background blends with the foreground artwork. -->
+    <color name="ic_launcher_background">#387793</color>
+</resources>

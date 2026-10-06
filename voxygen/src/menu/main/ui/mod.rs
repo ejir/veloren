@@ -688,6 +688,10 @@ pub struct MainMenuUi {
     // tip_no: u16,
     controls: Controls,
     bg_img_spec: &'static str,
+    // Tracks whether the Android soft keyboard is currently requested, so
+    // `set_ime_allowed` is only called when text input focus changes.
+    #[cfg(target_os = "android")]
+    ime_allowed: bool,
 }
 
 impl MainMenuUi {
@@ -722,6 +726,8 @@ impl MainMenuUi {
             ui,
             controls,
             bg_img_spec,
+            #[cfg(target_os = "android")]
+            ime_allowed: false,
         }
     }
 
@@ -812,6 +818,24 @@ impl MainMenuUi {
             None,
             &mut global_state.clipboard,
         );
+
+        // Show the Android soft keyboard while a text field is focused. Only runs when
+        // focus changes so the keyboard isn't needlessly re-requested every frame.
+        #[cfg(target_os = "android")]
+        {
+            let ime_wanted = match &self.controls.screen {
+                Screen::Login { screen, .. } => {
+                    screen.banner.username.is_focused()
+                        || screen.banner.password.is_focused()
+                        || screen.banner.server.is_focused()
+                },
+                _ => false,
+            };
+            if ime_wanted != self.ime_allowed {
+                self.ime_allowed = ime_wanted;
+                global_state.window.window().set_ime_allowed(ime_wanted);
+            }
+        }
 
         messages.into_iter().for_each(|message| {
             self.controls

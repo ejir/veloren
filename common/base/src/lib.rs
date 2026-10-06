@@ -1,5 +1,7 @@
 pub mod userdata_dir;
 
+#[cfg(target_os = "android")]
+pub use userdata_dir::set_android_userdata_dir;
 pub use userdata_dir::userdata_dir;
 
 /// Panic in debug or tests, log error/warn in release

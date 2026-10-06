@@ -55,6 +55,12 @@ jobs:
           echo "code=$version_code" >> "$GITHUB_OUTPUT"
           echo "Building Veloren Android $version (versionCode $version_code)."
 
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Validate release signing secrets and decode keystore
         shell: bash
         env:
@@ -71,13 +77,22 @@ jobs:
           printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
           chmod 600 "$keystore_path"
           test -s "$keystore_path"
+          # Fail fast when the decoded keystore, store password, or alias is
+          # wrong instead of surfacing a cryptic error at packaging time.
+          # The first output line also reports the keystore type (expect JKS).
+          keytool -list \
+            -keystore "$keystore_path" \
+            -storepass "$ANDROID_RELEASE_KEYSTORE_PASSWORD" \
+            -alias "$ANDROID_RELEASE_KEY_ALIAS"
+          # keytool offers no read-only key-password check; re-setting the key
+          # password to its current value verifies it without changing anything.
+          keytool -keypasswd \
+            -keystore "$keystore_path" \
+            -storepass "$ANDROID_RELEASE_KEYSTORE_PASSWORD" \
+            -alias "$ANDROID_RELEASE_KEY_ALIAS" \
+            -keypass "$ANDROID_RELEASE_KEY_PASSWORD" \
+            -new "$ANDROID_RELEASE_KEY_PASSWORD"
           echo "ANDROID_RELEASE_KEYSTORE_PATH=$keystore_path" >> "$GITHUB_ENV"
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
 
       - name: Set up Android SDK tools
         uses: android-actions/setup-android@v4

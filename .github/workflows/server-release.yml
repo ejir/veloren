@@ -1,0 +1,163 @@
+name: Server release
+
+on:
+  push:
+    tags:
+      - "server-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version label for manually built packages (default: manual-<short-sha>)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: server-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build server (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x86_64
+            archive_ext: tar.gz
+            exe_ext: ""
+          - os: windows-2022
+            target: windows-x86_64
+            archive_ext: zip
+            exe_ext: .exe
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 0
+
+    steps:
+      - name: Check out source and LFS assets
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          lfs: true
+
+      - name: Determine package version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#server-v}"
+            if [[ ! "$version" =~ ^(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})$ ]]; then
+              echo "::error::Expected a server-vMAJOR.MINOR.PATCH tag; got ${GITHUB_REF_NAME}."
+              exit 1
+            fi
+          else
+            input="${{ github.event.inputs.version }}"
+            if [[ -n "$input" ]]; then
+              if [[ ! "$input" =~ ^[A-Za-z0-9._-]+$ ]]; then
+                echo "::error::Version label may only contain letters, digits, '.', '_' and '-'."
+                exit 1
+              fi
+              version="$input"
+            else
+              version="manual-$(git rev-parse --short HEAD)"
+            fi
+          fi
+
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "name=$version" >> "$GITHUB_OUTPUT"
+          echo "Building Veloren server $version."
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          toolchain="$(tr -d '\r\n' < rust-toolchain)"
+          rustup toolchain install "$toolchain" --profile minimal
+          rustup show active-toolchain
+
+      - name: Cache Rust build output
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: server-release-${{ matrix.target }}
+
+      - name: Build veloren-server-cli
+        shell: bash
+        run: cargo build --locked --release -p veloren-server-cli
+
+      - name: Package binary with server assets
+        shell: bash
+        run: |
+          pkg="veloren-server-$VERSION-${{ matrix.target }}"
+          stage="dist/$pkg"
+          mkdir -p "$stage/assets"
+          cp "target/release/veloren-server-cli${{ matrix.exe_ext }}" "$stage/"
+          # Same asset set the server-cli Dockerfile ships: everything the
+          # dedicated server needs, without the client-only voxygen assets.
+          cp -r assets/common assets/server assets/world "$stage/assets/"
+          cat > "$stage/README.txt" <<'EOF'
+          Veloren dedicated server
+
+          Contents:
+            veloren-server-cli[.exe]  the server binary (run it from this directory)
+            assets/                   game data required by the server (keep next to the binary)
+            README.txt                this file
+
+          Quick start:
+            1. Extract this archive and cd into the extracted directory.
+            2. Run ./veloren-server-cli (Linux) or veloren-server-cli.exe (Windows).
+            3. A default settings.ron is created on first start; edit it to taste and restart.
+            4. Connect from the game with the server address and default port 14004.
+
+          See --help for CLI flags. The assets/ directory must stay next to the binary.
+          EOF
+          cd dist
+          if [[ "${{ matrix.archive_ext }}" == "zip" ]]; then
+            tar -a -c -f "$pkg.zip" "$pkg"
+            sha256sum "$pkg.zip" > "$pkg.zip.sha256"
+          else
+            tar -czf "$pkg.tar.gz" "$pkg"
+            sha256sum "$pkg.tar.gz" > "$pkg.tar.gz.sha256"
+          fi
+          ls -la
+
+      - name: Upload server package
+        uses: actions/upload-artifact@v4
+        with:
+          name: veloren-server-${{ env.VERSION }}-${{ matrix.target }}
+          if-no-files-found: error
+          path: |
+            dist/veloren-server-${{ env.VERSION }}-${{ matrix.target }}.${{ matrix.archive_ext }}
+            dist/veloren-server-${{ env.VERSION }}-${{ matrix.target }}.${{ matrix.archive_ext }}.sha256
+
+  release:
+    name: Publish server release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/server-v')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Determine release version
+        id: version
+        shell: bash
+        run: echo "name=${GITHUB_REF_NAME#server-v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download server packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: veloren-server-*
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Publish packages to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Veloren Server ${{ steps.version.outputs.name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          files: release-artifacts/*

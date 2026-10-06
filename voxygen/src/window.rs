@@ -273,7 +273,8 @@ impl Window {
         #[cfg(target_os = "android")] android_app: &winit::platform::android::activity::AndroidApp,
     ) -> Result<(Window, EventLoop), Error> {
         #[cfg(target_os = "android")]
-        let event_loop = {
+        #[allow(unused_mut)] // `mut` in case winit wants `&mut self` here
+        let mut event_loop = {
             let mut builder = winit::event_loop::EventLoop::builder();
             builder.with_android_app(android_app.clone());
             builder.build().unwrap()
@@ -292,11 +293,7 @@ impl Window {
             ))
             .with_maximized(window.maximised);
 
-        #[cfg(not(any(
-            target_os = "windows",
-            target_os = "macos",
-            target_os = "android"
-        )))]
+        #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "android")))]
         {
             use winit::platform::wayland::WindowAttributesExtWayland;
             attributes = attributes.with_name("net.veloren.veloren", "veloren");
@@ -311,6 +308,83 @@ impl Window {
 
         #[expect(deprecated)]
         let window = Arc::new(event_loop.create_window(attributes).unwrap());
+
+        // On Android the framework creates the native window (ANativeWindow /
+        // SurfaceView) asynchronously, after the activity resumes on the event loop.
+        // Creating the wgpu surface before that fails with
+        // `CreateSurfaceError(RawHandle(Unavailable))`, so pump the event loop until
+        // the window exists and has a nonzero size (or time out with a clear panic).
+        #[cfg(target_os = "android")]
+        {
+            use std::time::{Duration, Instant};
+            use tracing::info;
+            use winit::{
+                application::ApplicationHandler,
+                event::WindowEvent,
+                event_loop::ActiveEventLoop,
+                platform::pump_events::{EventLoopExtPumpEvents, PumpStatus},
+                window::WindowId,
+            };
+
+            struct WaitForNativeWindow {
+                resumed: bool,
+            }
+
+            impl ApplicationHandler for WaitForNativeWindow {
+                fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
+                    info!("Android activity resumed, native window coming up");
+                    self.resumed = true;
+                }
+
+                fn window_event(
+                    &mut self,
+                    _event_loop: &ActiveEventLoop,
+                    _window_id: WindowId,
+                    _event: WindowEvent,
+                ) {
+                }
+            }
+
+            info!("[stage] waiting for Android native window");
+            let mut waiter = WaitForNativeWindow { resumed: false };
+            let deadline = Instant::now() + Duration::from_secs(30);
+            loop {
+                match event_loop.pump_app_events(Some(Duration::from_millis(100)), &mut waiter) {
+                    PumpStatus::Continue => {},
+                    PumpStatus::Exit(_) => {
+                        warn!("Event loop exited during native-window wait; continuing anyway");
+                        break;
+                    },
+                }
+
+                if android_app.native_window().is_some() {
+                    let size = window.inner_size();
+                    if size.width > 0 && size.height > 0 {
+                        info!(
+                            "Android native window ready ({}x{})",
+                            size.width, size.height
+                        );
+                        break;
+                    }
+                }
+
+                if Instant::now() >= deadline {
+                    let window_present = android_app.native_window().is_some();
+                    let (width, height) = if window_present {
+                        let size = window.inner_size();
+                        (size.width, size.height)
+                    } else {
+                        (0, 0)
+                    };
+                    panic!(
+                        "Timed out waiting for the Android native window (resumed={}, \
+                         native_window_present={}, size={}x{}); cannot create the wgpu surface \
+                         without a window.",
+                        waiter.resumed, window_present, width, height,
+                    );
+                }
+            }
+        }
 
         let renderer = Renderer::new(
             Arc::clone(&window),

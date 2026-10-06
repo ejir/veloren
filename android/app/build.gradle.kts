@@ -1,3 +1,4 @@
+import java.io.File
 import java.security.MessageDigest
 import org.gradle.api.tasks.Sync
 
@@ -47,6 +48,10 @@ android {
                 storePassword = requireNotNull(releaseStorePassword)
                 keyAlias = requireNotNull(releaseKeyAlias)
                 keyPassword = requireNotNull(releaseKeyPassword)
+                // The release keystore is generated with `-storetype JKS`
+                // (see android/README.md). Pin the type explicitly instead of
+                // relying on the JDK's default keystore type.
+                storeType = "JKS"
             }
         }
     }
@@ -128,7 +133,7 @@ val buildRustAndroid = tasks.register<Exec>("buildRustAndroid") {
             "PATH",
             listOf(cmakeBin.absolutePath, inheritedPath)
                 .filter { it.isNotBlank() }
-                .joinToString(java.io.File.pathSeparator),
+                .joinToString(File.pathSeparator),
         )
         environment("ANDROID_NDK_HOME", android.ndkDirectory.absolutePath)
         commandLine(
@@ -144,6 +149,27 @@ val buildRustAndroid = tasks.register<Exec>("buildRustAndroid") {
             "--no-default-features",
             "--features", "android",
         )
+    }
+
+    doLast {
+        // The Rust cdylib links the NDK's shared C++ runtime (shaderc and
+        // other native code are C++). Android does not provide
+        // libc++_shared.so on device, so the NDK prebuilt must be packaged
+        // next to our library or dlopen fails with UnsatisfiedLinkError.
+        val osName = System.getProperty("os.name").lowercase()
+        val hostTag = when {
+            "linux" in osName -> "linux-x86_64"
+            "mac" in osName -> "darwin-x86_64"
+            "windows" in osName -> "windows-x86_64"
+            else -> error("Unsupported host OS for NDK prebuilt lookup: $osName")
+        }
+        val stl = android.ndkDirectory.resolve(
+            "toolchains/llvm/prebuilt/$hostTag/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so",
+        )
+        check(stl.isFile) { "NDK libc++_shared.so not found: ${stl.absolutePath}" }
+        val abiDir = outputDirectory.resolve("arm64-v8a")
+        abiDir.mkdirs()
+        stl.copyTo(abiDir.resolve("libc++_shared.so"), overwrite = true)
     }
 }
 
@@ -162,6 +188,10 @@ val verifyReleaseSigning = tasks.register("verifyReleaseSigning") {
     }
 }
 
-tasks.named("preReleaseBuild").configure {
+// AGP registers per-variant lifecycle tasks (preReleaseBuild, assembleRelease,
+// ...) only after this script is evaluated, so an eager tasks.named(...)
+// lookup fails configuration with UnknownTaskException. matching() returns a
+// live view and configureEach() fires once AGP adds the task.
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
     dependsOn(verifyReleaseSigning)
 }

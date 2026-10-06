@@ -372,6 +372,21 @@ impl Renderer {
         info!("Using {:?} as the surface format", format);
 
         let present_mode = other_modes.present_mode.into();
+        // Some surfaces (notably on Android, where only `Inherit` may be offered)
+        // don't support `Opaque`, so fall back to whatever the surface offers
+        // instead of failing validation in `Surface::configure`.
+        let alpha_mode = if surface_capabilities
+            .alpha_modes
+            .contains(&wgpu::CompositeAlphaMode::Opaque)
+        {
+            wgpu::CompositeAlphaMode::Opaque
+        } else {
+            *surface_capabilities
+                .alpha_modes
+                .first()
+                .expect("There should never be no supported alpha modes")
+        };
+        info!("Using {:?} as the surface alpha mode", alpha_mode);
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             desired_maximum_frame_latency: 2,
@@ -387,7 +402,7 @@ impl Renderer {
                     .find(|mode| PresentMode::try_from(**mode).is_ok())
                     .expect("There should never be no supported present modes")
             },
-            alpha_mode: wgpu::CompositeAlphaMode::Opaque,
+            alpha_mode,
             view_formats: Vec::new(),
         };
 

@@ -16,12 +16,10 @@ static GLOBAL: common_base::tracy_client::ProfiledAllocator<std::alloc::System> 
     common_base::tracy_client::ProfiledAllocator::new(std::alloc::System, 128);
 
 #[cfg(not(target_os = "android"))]
-fn main() {
-    veloren_voxygen::app::run();
-}
+fn main() { veloren_voxygen::app::run(); }
 
 // Android loads the library and invokes `android_main` instead of running this
-// desktop binary entry point. Keeping a no-op `main` also lets Cargo inspect all
-// targets for that triple without inventing a second startup path.
+// desktop binary entry point. Keeping a no-op `main` also lets Cargo inspect
+// all targets for that triple without inventing a second startup path.
 #[cfg(target_os = "android")]
 fn main() {}

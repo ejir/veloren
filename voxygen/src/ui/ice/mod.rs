@@ -22,7 +22,7 @@ use crate::{
 };
 use common::slowjob::SlowJobPool;
 use common_base::span;
-use iced::{Cache, Size, UserInterface, mouse};
+use iced::{Cache, Size, UserInterface, mouse, touch};
 use vek::*;
 
 pub type Element<'a, M> = iced::Element<'a, M, IcedRenderer>;
@@ -45,9 +45,29 @@ impl IcedUi {
         let scale_factor = window.scale_factor();
         let renderer = window.renderer_mut();
         let physical_resolution = renderer.resolution();
-        let scale = Scale::new(physical_resolution, scale_factor, scale_mode, 1.2);
+        // Phone screens are small and dense: the desktop-oriented scale modes (e.g.
+        // RelativeToWindow(1920x1080)) shrink the UI to unreadable, untappable sizes.
+        // Use density-independent pixels instead so widgets stay readable and touch
+        // targets stay tappable.
+        #[cfg(target_os = "android")]
+        let (scale_mode, extra_factor) = (ScaleMode::DpiFactor, 1.0);
+        #[cfg(not(target_os = "android"))]
+        let extra_factor = 1.2;
+        let scale = Scale::new(physical_resolution, scale_factor, scale_mode, extra_factor);
 
         let scaled_resolution = scale.scaled_resolution().map(|e| e as f32);
+
+        tracing::info!(
+            "Iced UI scale: physical={}x{}, scale_factor={:.2}, mode={:?}, scaled={:.0}x{:.0}, \
+             event_divisor={:.2}",
+            physical_resolution.x,
+            physical_resolution.y,
+            scale_factor,
+            scale_mode,
+            scaled_resolution.x,
+            scaled_resolution.y,
+            scale.scale_factor_logical(),
+        );
 
         // TODO: examine how much mem fonts take up and reduce clones if significant
         Ok(Self {
@@ -128,6 +148,36 @@ impl IcedUi {
                     },
                 }));
             },
+            // Touchscreens don't emit cursor movement, so keep the tracked cursor
+            // position in sync with touches: iced widgets (notably buttons)
+            // hit-test against it. Scale positions like cursor movement events.
+            Event::Touch(touch_event) => {
+                // TODO: return f32 here
+                let scale = self.scale.scale_factor_logical() as f32;
+                let scaled = |p: iced::Point| iced::Point::new(p.x / scale, p.y / scale);
+                let event = match touch_event {
+                    touch::Event::FingerPressed { id, position } => {
+                        let position = scaled(position);
+                        self.cursor_position = Vec2::new(position.x, position.y);
+                        touch::Event::FingerPressed { id, position }
+                    },
+                    touch::Event::FingerMoved { id, position } => {
+                        let position = scaled(position);
+                        self.cursor_position = Vec2::new(position.x, position.y);
+                        touch::Event::FingerMoved { id, position }
+                    },
+                    touch::Event::FingerLifted { id, position } => {
+                        let position = scaled(position);
+                        self.cursor_position = Vec2::new(position.x, position.y);
+                        touch::Event::FingerLifted { id, position }
+                    },
+                    touch::Event::FingerLost { id, position } => touch::Event::FingerLost {
+                        id,
+                        position: scaled(position),
+                    },
+                };
+                self.events.push(Event::Touch(event));
+            },
             event => self.events.push(event),
         }
     }
@@ -162,6 +212,13 @@ impl IcedUi {
             // Somewhat inefficient for elements that won't change size after a window
             // resize
             let physical_resolution = renderer.resolution();
+            tracing::info!(
+                "Iced UI resized: physical={}x{}, scaled={:.0}x{:.0}",
+                physical_resolution.x,
+                physical_resolution.y,
+                scaled_resolution.x,
+                scaled_resolution.y,
+            );
             if physical_resolution.map(|e| e > 0).reduce_and() {
                 self.renderer
                     .resize(scaled_resolution, physical_resolution, renderer);
