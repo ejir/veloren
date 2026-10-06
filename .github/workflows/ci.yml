@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write # TEMP-DEBUG: remove with the failure-report steps
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -34,7 +35,24 @@ jobs:
 
       - name: Check formatting
         shell: bash
-        run: cargo fmt --all -- --check
+        run: |
+          set -o pipefail
+          cargo fmt --all -- --check 2>&1 | tee /tmp/fmt.log
+      # TEMP-DEBUG: remove once CI is green (sandbox cannot fetch Actions logs)
+      - name: Post failure log to PR
+        if: failure() && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## TEMP-DEBUG CI failure: ${{ job.name }} (run ${{ github.run_id }})"
+            echo ""
+            echo '```text'
+            tail -c 30000 /tmp/fmt.log
+            echo '```'
+          } > /tmp/report.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/report.md
 
   clippy:
     name: Clippy
@@ -72,7 +90,24 @@ jobs:
 
       - name: Run clippy on the whole workspace
         shell: bash
-        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+        run: |
+          set -o pipefail
+          cargo clippy --locked --workspace --all-targets -- -D warnings 2>&1 | tee /tmp/clippy.log
+      # TEMP-DEBUG: remove once CI is green (sandbox cannot fetch Actions logs)
+      - name: Post failure log to PR
+        if: failure() && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## TEMP-DEBUG CI failure: ${{ job.name }} (run ${{ github.run_id }})"
+            echo ""
+            echo '```text'
+            tail -c 30000 /tmp/clippy.log
+            echo '```'
+          } > /tmp/report.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/report.md
 
   check:
     name: Check
@@ -109,4 +144,21 @@ jobs:
 
       - name: Check the whole workspace
         shell: bash
-        run: cargo check --locked --workspace --all-targets
+        run: |
+          set -o pipefail
+          cargo check --locked --workspace --all-targets 2>&1 | tee /tmp/check.log
+      # TEMP-DEBUG: remove once CI is green (sandbox cannot fetch Actions logs)
+      - name: Post failure log to PR
+        if: failure() && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## TEMP-DEBUG CI failure: ${{ job.name }} (run ${{ github.run_id }})"
+            echo ""
+            echo '```text'
+            tail -c 30000 /tmp/check.log
+            echo '```'
+          } > /tmp/report.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/report.md
