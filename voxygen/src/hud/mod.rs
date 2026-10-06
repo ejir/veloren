@@ -1564,7 +1564,10 @@ impl Hud {
                     .font_size(self.fonts.cyri.scale(18))
                     .color(Color::Rgba(1.0, 1.0, 1.0, 0.8))
                     .x_y(center.x, center.y)
-                    .set(self.ids.android_touch_controls[index + label_offset], ui_widgets);
+                    .set(
+                        self.ids.android_touch_controls[index + label_offset],
+                        ui_widgets,
+                    );
             }
         }
 
