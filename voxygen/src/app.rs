@@ -1,7 +1,7 @@
 //! Shared Voxygen bootstrap for desktop builds and the Android NativeActivity.
 
-use clap::Parser;
-use i18n::{self, LocalizationHandle};
+#[cfg(feature = "singleplayer")]
+use crate::singleplayer::SingleplayerState;
 use crate::{
     GlobalState,
     audio::AudioFrontend,
@@ -15,28 +15,28 @@ use crate::{
     settings::{AudioOutput, Settings, get_fps},
     window::Window,
 };
-#[cfg(feature = "singleplayer")]
-use crate::singleplayer::SingleplayerState;
+use clap::Parser;
+use i18n::{self, LocalizationHandle};
 
+#[cfg(feature = "egui-ui")]
+use crate::ui::egui::EguiState;
 use chrono::Utc;
 use common::{clock::Clock, consts::MIN_RECOMMENDED_TOKIO_THREADS};
-use std::{
-    path::PathBuf,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
-use tokio::runtime::Builder;
 #[cfg(target_os = "android")]
 use std::{
     ffi::CString,
     io::{self, Read},
     path::{Component, Path},
 };
+use std::{
+    path::PathBuf,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+};
+use tokio::runtime::Builder;
 use tracing::{info, warn};
-#[cfg(feature = "egui-ui")]
-use crate::ui::egui::EguiState;
 use wgpu::{Backends, Instance};
 
 pub fn run(
@@ -333,8 +333,7 @@ fn initialize_android_storage(app: &winit::platform::android::activity::AndroidA
                 .expect("failed to remove an incomplete Android asset extraction");
         }
         if assets_dir.exists() {
-            std::fs::remove_dir_all(&assets_dir)
-                .expect("failed to remove outdated Android assets");
+            std::fs::remove_dir_all(&assets_dir).expect("failed to remove outdated Android assets");
         }
         std::fs::create_dir_all(&staging_dir)
             .expect("failed to create Android asset extraction directory");
@@ -360,13 +359,16 @@ fn initialize_android_storage(app: &winit::platform::android::activity::AndroidA
                 .unwrap_or_else(|| panic!("missing Veloren asset in APK: {apk_path}"));
             let destination = staging_dir.join(relative);
             if let Some(parent) = destination.parent() {
-                std::fs::create_dir_all(parent)
-                    .unwrap_or_else(|error| panic!("failed to create {}: {error}", parent.display()));
+                std::fs::create_dir_all(parent).unwrap_or_else(|error| {
+                    panic!("failed to create {}: {error}", parent.display())
+                });
             }
-            let mut output = std::fs::File::create(&destination)
-                .unwrap_or_else(|error| panic!("failed to create {}: {error}", destination.display()));
-            io::copy(&mut asset, &mut output)
-                .unwrap_or_else(|error| panic!("failed to extract {}: {error}", destination.display()));
+            let mut output = std::fs::File::create(&destination).unwrap_or_else(|error| {
+                panic!("failed to create {}: {error}", destination.display())
+            });
+            io::copy(&mut asset, &mut output).unwrap_or_else(|error| {
+                panic!("failed to extract {}: {error}", destination.display())
+            });
         }
 
         let extracted_canary = std::fs::read_to_string(staging_dir.join("common/canary.canary"))
@@ -381,8 +383,7 @@ fn initialize_android_storage(app: &winit::platform::android::activity::AndroidA
     }
 
     let userdata_dir = app_data_dir.join("userdata");
-    std::fs::create_dir_all(&userdata_dir)
-        .expect("failed to create Android user data directory");
+    std::fs::create_dir_all(&userdata_dir).expect("failed to create Android user data directory");
     common_base::set_android_userdata_dir(userdata_dir);
     common::assets::set_android_assets_path(assets_dir);
 }

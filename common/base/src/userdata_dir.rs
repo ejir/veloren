@@ -10,9 +10,7 @@ static ANDROID_USERDATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 /// Android's NativeActivity path is not available through the desktop directory
 /// discovery fallback, so the app provides its Context-owned files directory.
 #[cfg(target_os = "android")]
-pub fn set_android_userdata_dir(path: PathBuf) {
-    let _ = ANDROID_USERDATA_DIR.set(path);
-}
+pub fn set_android_userdata_dir(path: PathBuf) { let _ = ANDROID_USERDATA_DIR.set(path); }
 
 #[cfg(target_os = "android")]
 fn android_userdata_dir() -> Option<PathBuf> { ANDROID_USERDATA_DIR.get().cloned() }

@@ -4747,10 +4747,9 @@ impl Hud {
         if self.show.ingame && self.show.want_grab {
             const TOUCH_CONTROL_COUNT: usize = 12;
             if self.ids.android_touch_controls.len() < TOUCH_CONTROL_COUNT {
-                self.ids.android_touch_controls.resize(
-                    TOUCH_CONTROL_COUNT,
-                    &mut ui_widgets.widget_id_generator(),
-                );
+                self.ids
+                    .android_touch_controls
+                    .resize(TOUCH_CONTROL_COUNT, &mut ui_widgets.widget_id_generator());
             }
 
             // The touch hit regions live in physical screen coordinates; these
@@ -4764,10 +4763,7 @@ impl Hud {
                 (0.76, 0.47, 0.15, "ROLL"),
             ];
             for (index, (x, y, diameter, label)) in controls.into_iter().enumerate() {
-                let center = Vec2::new(
-                    (x - 0.5) * ui_widgets.win_w,
-                    (0.5 - y) * ui_widgets.win_h,
-                );
+                let center = Vec2::new((x - 0.5) * ui_widgets.win_w, (0.5 - y) * ui_widgets.win_h);
                 let size = ui_widgets.win_h * diameter;
                 Rectangle::fill([size, size])
                     .rgba(0.04, 0.07, 0.09, 0.38)

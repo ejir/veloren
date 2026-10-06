@@ -11,10 +11,9 @@
 
 #[macro_use]
 pub mod ui;
-pub mod audio;
-#[cfg(target_os = "android")]
-mod android_log;
+#[cfg(target_os = "android")] mod android_log;
 pub mod app;
+pub mod audio;
 pub mod cli;
 pub mod cmd;
 mod credits;
@@ -42,12 +41,13 @@ pub mod window;
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub fn android_main(app: winit::platform::android::activity::AndroidApp) {
-    // Point TLS certificate discovery at the Android system CA store before anything else
-    // runs. Neither rustls-native-certs (used by hyper-rustls/authc and
-    // rustls-platform-verifier) nor openssl-probe knows the Android trust store location,
-    // but SSL_CERT_DIR is honored and every file in the directory is tried.
-    // SAFETY: no other Rust threads exist yet and nothing else in the process touches the
-    // environment concurrently this early in startup.
+    // Point TLS certificate discovery at the Android system CA store before
+    // anything else runs. Neither rustls-native-certs (used by
+    // hyper-rustls/authc and rustls-platform-verifier) nor openssl-probe knows
+    // the Android trust store location, but SSL_CERT_DIR is honored and every
+    // file in the directory is tried. SAFETY: no other Rust threads exist yet
+    // and nothing else in the process touches the environment concurrently this
+    // early in startup.
     unsafe {
         std::env::set_var("SSL_CERT_DIR", "/system/etc/security/cacerts");
     }

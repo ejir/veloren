@@ -293,11 +293,7 @@ impl Window {
             ))
             .with_maximized(window.maximised);
 
-        #[cfg(not(any(
-            target_os = "windows",
-            target_os = "macos",
-            target_os = "android"
-        )))]
+        #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "android")))]
         {
             use winit::platform::wayland::WindowAttributesExtWayland;
             attributes = attributes.with_name("net.veloren.veloren", "veloren");
@@ -345,7 +341,8 @@ impl Window {
                     _event_loop: &ActiveEventLoop,
                     _window_id: WindowId,
                     _event: WindowEvent,
-                ) {}
+                ) {
+                }
             }
 
             info!("[stage] waiting for Android native window");
@@ -363,7 +360,10 @@ impl Window {
                 if android_app.native_window().is_some() {
                     let size = window.inner_size();
                     if size.width > 0 && size.height > 0 {
-                        info!("Android native window ready ({}x{})", size.width, size.height);
+                        info!(
+                            "Android native window ready ({}x{})",
+                            size.width, size.height
+                        );
                         break;
                     }
                 }
@@ -380,10 +380,7 @@ impl Window {
                         "Timed out waiting for the Android native window (resumed={}, \
                          native_window_present={}, size={}x{}); cannot create the wgpu surface \
                          without a window.",
-                        waiter.resumed,
-                        window_present,
-                        width,
-                        height,
+                        waiter.resumed, window_present, width, height,
                     );
                 }
             }

@@ -389,8 +389,9 @@ fn tls_client_config() -> Result<quinn::ClientConfig, crate::error::Error> {
 
 /// Build a TLS client config from the Android system CA store.
 ///
-/// `rustls-platform-verifier` cannot access the platform trust store on Android, but
-/// the system CAs are world-readable PEM files, so load them directly.
+/// `rustls-platform-verifier` cannot access the platform trust store on
+/// Android, but the system CAs are world-readable PEM files, so load them
+/// directly.
 #[cfg(target_os = "android")]
 fn android_system_roots_config() -> std::io::Result<quinn::ClientConfig> {
     use rustls::pki_types::{CertificateDer, pem::PemObject};

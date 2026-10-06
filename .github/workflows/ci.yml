@@ -46,7 +46,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
-            echo "## TEMP-DEBUG CI failure: ${{ job.name }} (run ${{ github.run_id }})"
+            echo "## TEMP-DEBUG CI failure: ${{ github.job }} (run ${{ github.run_id }})"
             echo ""
             echo '```text'
             tail -c 30000 /tmp/fmt.log
@@ -73,6 +73,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libasound2-dev \
             libudev-dev \
+            mold \
             pkg-config
 
       - name: Install pinned Rust toolchain with clippy
@@ -101,7 +102,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
-            echo "## TEMP-DEBUG CI failure: ${{ job.name }} (run ${{ github.run_id }})"
+            echo "## TEMP-DEBUG CI failure: ${{ github.job }} (run ${{ github.run_id }})"
             echo ""
             echo '```text'
             tail -c 30000 /tmp/clippy.log
@@ -128,6 +129,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libasound2-dev \
             libudev-dev \
+            mold \
             pkg-config
 
       - name: Install pinned Rust toolchain
@@ -155,7 +157,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
-            echo "## TEMP-DEBUG CI failure: ${{ job.name }} (run ${{ github.run_id }})"
+            echo "## TEMP-DEBUG CI failure: ${{ github.job }} (run ${{ github.run_id }})"
             echo ""
             echo '```text'
             tail -c 30000 /tmp/check.log

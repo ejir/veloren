@@ -58,10 +58,10 @@ use hashbrown::HashMap;
 use interactable::{BlockInteraction, EntityInteraction, Interactable, get_interactables};
 use settings_change::Language::ChangeLanguage;
 use target::targets_under_cursor;
-#[cfg(target_os = "android")]
-use winit::event::TouchPhase;
 #[cfg(feature = "egui-ui")]
 use voxygen_egui::EguiDebugInfo;
+#[cfg(target_os = "android")]
+use winit::event::TouchPhase;
 
 /** The zoom scroll delta that is considered an "intent"
     to zoom, rather than the accidental zooming that Zoom Lock
@@ -246,12 +246,12 @@ impl SessionState {
         for (_, control) in self.android_touches.drain() {
             match control {
                 AndroidTouchControl::Move { .. } => {
-                    global_state.window.send_event(Event::AnalogGameInput(
-                        AnalogGameInput::MovementX(0.0),
-                    ));
-                    global_state.window.send_event(Event::AnalogGameInput(
-                        AnalogGameInput::MovementY(0.0),
-                    ));
+                    global_state
+                        .window
+                        .send_event(Event::AnalogGameInput(AnalogGameInput::MovementX(0.0)));
+                    global_state
+                        .window
+                        .send_event(Event::AnalogGameInput(AnalogGameInput::MovementY(0.0)));
                 },
                 AndroidTouchControl::Button(button) => global_state
                     .window
@@ -292,12 +292,12 @@ impl SessionState {
                         .send_event(Event::InputUpdate(button, true));
                     AndroidTouchControl::Button(button)
                 } else if position.x < width * 0.42 && position.y > height * 0.32 {
-                    global_state.window.send_event(Event::AnalogGameInput(
-                        AnalogGameInput::MovementX(0.0),
-                    ));
-                    global_state.window.send_event(Event::AnalogGameInput(
-                        AnalogGameInput::MovementY(0.0),
-                    ));
+                    global_state
+                        .window
+                        .send_event(Event::AnalogGameInput(AnalogGameInput::MovementX(0.0)));
+                    global_state
+                        .window
+                        .send_event(Event::AnalogGameInput(AnalogGameInput::MovementY(0.0)));
                     AndroidTouchControl::Move { origin: position }
                 } else {
                     AndroidTouchControl::Look { last: position }
@@ -940,7 +940,11 @@ impl PlayState for SessionState {
                         return PlayStateResult::Shutdown;
                     },
                     #[cfg(target_os = "android")]
-                    Event::Touch { id, phase, position } => {
+                    Event::Touch {
+                        id,
+                        phase,
+                        position,
+                    } => {
                         self.handle_android_touch(id, phase, position, global_state);
                     },
                     Event::InputUpdate(input, state)

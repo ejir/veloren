@@ -57,7 +57,8 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         // Chooses a path to store screenshots. Android has no conventional Pictures
-        // directory for a native-only Activity, so keep them in the app-private data dir.
+        // directory for a native-only Activity, so keep them in the app-private data
+        // dir.
         #[cfg(not(target_os = "android"))]
         let screenshots_path = {
             let user_dirs = UserDirs::new().expect("System's $HOME directory path not found!");

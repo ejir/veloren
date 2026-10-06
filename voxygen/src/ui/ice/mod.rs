@@ -171,11 +171,9 @@ impl IcedUi {
                         self.cursor_position = Vec2::new(position.x, position.y);
                         touch::Event::FingerLifted { id, position }
                     },
-                    touch::Event::FingerLost { id, position } => {
-                        touch::Event::FingerLost {
-                            id,
-                            position: scaled(position),
-                        }
+                    touch::Event::FingerLost { id, position } => touch::Event::FingerLost {
+                        id,
+                        position: scaled(position),
                     },
                 };
                 self.events.push(Event::Touch(event));
