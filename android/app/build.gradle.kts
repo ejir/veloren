@@ -1,3 +1,4 @@
+import java.io.File
 import java.security.MessageDigest
 import org.gradle.api.tasks.Sync
 
@@ -128,7 +129,7 @@ val buildRustAndroid = tasks.register<Exec>("buildRustAndroid") {
             "PATH",
             listOf(cmakeBin.absolutePath, inheritedPath)
                 .filter { it.isNotBlank() }
-                .joinToString(java.io.File.pathSeparator),
+                .joinToString(File.pathSeparator),
         )
         environment("ANDROID_NDK_HOME", android.ndkDirectory.absolutePath)
         commandLine(
