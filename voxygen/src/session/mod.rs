@@ -102,16 +102,22 @@ enum AndroidTouchControl {
 fn android_touch_button(position: Vec2<f32>, width: f32, height: f32) -> Option<GameInput> {
     // Landscape touch layout for combat, movement, and interaction targets.
     // The left half remains available for the movement stick and camera swipes.
-    let radius = height * 0.075;
+    // Positions must match the touch overlay drawn by the HUD.
+    let combat_radius = height * 0.075;
+    let menu_radius = height * 0.05;
     [
-        (GameInput::Primary, Vec2::new(width * 0.90, height * 0.78)),
-        (GameInput::Secondary, Vec2::new(width * 0.76, height * 0.85)),
-        (GameInput::Jump, Vec2::new(width * 0.76, height * 0.66)),
-        (GameInput::Interact, Vec2::new(width * 0.90, height * 0.57)),
-        (GameInput::Roll, Vec2::new(width * 0.76, height * 0.47)),
+        (GameInput::Primary, Vec2::new(width * 0.90, height * 0.78), combat_radius),
+        (GameInput::Secondary, Vec2::new(width * 0.76, height * 0.85), combat_radius),
+        (GameInput::Jump, Vec2::new(width * 0.76, height * 0.66), combat_radius),
+        (GameInput::Interact, Vec2::new(width * 0.90, height * 0.57), combat_radius),
+        (GameInput::Roll, Vec2::new(width * 0.76, height * 0.47), combat_radius),
+        (GameInput::Inventory, Vec2::new(width * 0.56, height * 0.075), menu_radius),
+        (GameInput::Diary, Vec2::new(width * 0.66, height * 0.075), menu_radius),
+        (GameInput::Settings, Vec2::new(width * 0.76, height * 0.075), menu_radius),
+        (GameInput::Escape, Vec2::new(width * 0.86, height * 0.075), menu_radius),
     ]
     .into_iter()
-    .find_map(|(button, center)| {
+    .find_map(|(button, center, radius)| {
         ((position - center).magnitude_squared() <= radius * radius).then_some(button)
     })
 }
