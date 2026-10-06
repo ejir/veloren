@@ -45,7 +45,15 @@ impl IcedUi {
         let scale_factor = window.scale_factor();
         let renderer = window.renderer_mut();
         let physical_resolution = renderer.resolution();
-        let scale = Scale::new(physical_resolution, scale_factor, scale_mode, 1.2);
+        // Phone screens are small and dense: the desktop-oriented scale modes (e.g.
+        // RelativeToWindow(1920x1080)) shrink the UI to unreadable, untappable sizes.
+        // Use density-independent pixels instead so widgets stay readable and touch
+        // targets stay tappable.
+        #[cfg(target_os = "android")]
+        let (scale_mode, extra_factor) = (ScaleMode::DpiFactor, 1.0);
+        #[cfg(not(target_os = "android"))]
+        let extra_factor = 1.2;
+        let scale = Scale::new(physical_resolution, scale_factor, scale_mode, extra_factor);
 
         let scaled_resolution = scale.scaled_resolution().map(|e| e as f32);
 
