@@ -371,6 +371,55 @@ pub struct CharacterList {
     pub loading: bool,
 }
 
+fn tls_client_config() -> Result<quinn::ClientConfig, crate::error::Error> {
+    match quinn::ClientConfig::try_with_platform_verifier() {
+        Ok(config) => Ok(config),
+        Err(e) => {
+            warn!(?e, "Platform TLS verifier unavailable");
+            #[cfg(target_os = "android")]
+            return android_system_roots_config().map_err(|fallback_e| {
+                warn!(?fallback_e, "Android system CA store fallback failed");
+                e.into()
+            });
+            #[cfg(not(target_os = "android"))]
+            Err(e.into())
+        },
+    }
+}
+
+/// Build a TLS client config from the Android system CA store.
+///
+/// `rustls-platform-verifier` cannot access the platform trust store on Android, but
+/// the system CAs are world-readable PEM files, so load them directly.
+#[cfg(target_os = "android")]
+fn android_system_roots_config() -> std::io::Result<quinn::ClientConfig> {
+    use rustls::pki_types::{CertificateDer, pem::PemObject};
+    use std::io::{Error as IoError, ErrorKind};
+
+    let mut certs = Vec::new();
+    for entry in std::fs::read_dir("/system/etc/security/cacerts")? {
+        let path = entry?.path();
+        let bytes = std::fs::read(&path)?;
+        match CertificateDer::from_pem_slice(&bytes) {
+            Ok(cert) => certs.push(cert),
+            Err(e) => warn!(?path, "Skipping unreadable system CA file: {e:?}"),
+        }
+    }
+    if certs.is_empty() {
+        return Err(IoError::new(
+            ErrorKind::NotFound,
+            "no CA certificates in the Android system store",
+        ));
+    }
+    let mut roots = rustls::RootCertStore::empty();
+    let (added, ignored) = roots.add_parsable_certificates(certs);
+    tracing::info!(added, ignored, "Loaded Android system CA certificates");
+    let roots = std::sync::Arc::new(roots);
+    let config = quinn::ClientConfig::with_root_certificates(roots)
+        .expect("system CA roots must build a valid TLS client config");
+    Ok(config)
+}
+
 async fn connect_quic(
     network: &Network,
     hostname: String,
@@ -379,7 +428,7 @@ async fn connect_quic(
     validate_tls: bool,
 ) -> Result<network::Participant, crate::error::Error> {
     let config = if validate_tls {
-        quinn::ClientConfig::try_with_platform_verifier()?
+        tls_client_config()?
     } else {
         warn!(
             "skipping validation of server identity. There is no guarantee that the server you're \
