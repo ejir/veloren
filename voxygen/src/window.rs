@@ -325,7 +325,8 @@ impl Window {
             use winit::{
                 application::ApplicationHandler,
                 event::WindowEvent,
-                event_loop::{ActiveEventLoop, PumpStatus},
+                event_loop::ActiveEventLoop,
+                platform::pump_events::{EventLoopExtPumpEvents, PumpStatus},
                 window::WindowId,
             };
 
