@@ -1,5 +1,24 @@
 use std::path::PathBuf;
+#[cfg(target_os = "android")]
+use std::sync::OnceLock;
 use tracing::warn;
+
+#[cfg(target_os = "android")]
+static ANDROID_USERDATA_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Set Voxygen's private, writable data directory before any config is loaded.
+/// Android's NativeActivity path is not available through the desktop directory
+/// discovery fallback, so the app provides its Context-owned files directory.
+#[cfg(target_os = "android")]
+pub fn set_android_userdata_dir(path: PathBuf) {
+    let _ = ANDROID_USERDATA_DIR.set(path);
+}
+
+#[cfg(target_os = "android")]
+fn android_userdata_dir() -> Option<PathBuf> { ANDROID_USERDATA_DIR.get().cloned() }
+
+#[cfg(not(target_os = "android"))]
+fn android_userdata_dir() -> Option<PathBuf> { None }
 
 const VELOREN_USERDATA_ENV: &str = "VELOREN_USERDATA";
 
@@ -29,6 +48,7 @@ pub fn userdata_dir() -> PathBuf {
     // 1. The VELOREN_USERDATA runtime environment variable
     std::env::var_os(VELOREN_USERDATA_ENV)
         .map(PathBuf::from)
+        .or_else(android_userdata_dir)
         // 2. The VELOREN_USERDATA_STRATEGY compile time environment variable
         .or_else(|| match option_env!("VELOREN_USERDATA_STRATEGY") {
             // "system" => system specific project data directory

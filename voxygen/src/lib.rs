@@ -12,6 +12,7 @@
 #[macro_use]
 pub mod ui;
 pub mod audio;
+pub mod app;
 pub mod cli;
 pub mod cmd;
 mod credits;
@@ -33,6 +34,14 @@ pub mod settings;
 #[cfg(feature = "singleplayer")]
 pub mod singleplayer;
 pub mod window;
+
+/// Entry point used by Android's NativeActivity loader.
+#[cfg(target_os = "android")]
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub fn android_main(app: winit::platform::android::activity::AndroidApp) {
+    crate::app::run(&app);
+}
 
 #[cfg(feature = "singleplayer")]
 use crate::singleplayer::Singleplayer;

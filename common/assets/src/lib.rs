@@ -10,6 +10,8 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
+#[cfg(target_os = "android")]
+use std::sync::OnceLock;
 
 pub use assets_manager::{
     Asset, AssetCache, BoxedError, Error, FileAsset, SharedString,
@@ -18,6 +20,15 @@ pub use assets_manager::{
 };
 
 mod fs;
+#[cfg(target_os = "android")]
+static ANDROID_ASSETS_PATH: OnceLock<PathBuf> = OnceLock::new();
+
+/// Set the extracted, read-only game asset directory before loading any assets.
+#[cfg(target_os = "android")]
+pub fn set_android_assets_path(path: PathBuf) {
+    let _ = ANDROID_ASSETS_PATH.set(path);
+}
+
 #[cfg(feature = "plugins")] mod plugin_cache;
 mod walk;
 pub use walk::{Walk, walk_tree};
@@ -345,6 +356,13 @@ lazy_static! {
         // 1. VELOREN_ASSETS environment variable
         if let Ok(var) = std::env::var("VELOREN_ASSETS") {
             paths.push(var.into());
+        }
+
+        // Android packages assets inside the APK, so Voxygen extracts them once to its
+        // private files directory and registers that path before this lazy static is used.
+        #[cfg(target_os = "android")]
+        if let Some(path) = ANDROID_ASSETS_PATH.get() {
+            paths.push(path.clone());
         }
 
         // 2. Executable path
