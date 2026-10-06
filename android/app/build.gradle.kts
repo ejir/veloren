@@ -48,6 +48,10 @@ android {
                 storePassword = requireNotNull(releaseStorePassword)
                 keyAlias = requireNotNull(releaseKeyAlias)
                 keyPassword = requireNotNull(releaseKeyPassword)
+                // The release keystore is generated with `-storetype JKS`
+                // (see android/README.md). Pin the type explicitly instead of
+                // relying on the JDK's default keystore type.
+                storeType = "JKS"
             }
         }
     }
