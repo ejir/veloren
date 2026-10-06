@@ -49,6 +49,18 @@ impl IcedUi {
 
         let scaled_resolution = scale.scaled_resolution().map(|e| e as f32);
 
+        tracing::info!(
+            "Iced UI scale: physical={}x{}, scale_factor={:.2}, mode={:?}, scaled={:.0}x{:.0}, \
+             event_divisor={:.2}",
+            physical_resolution.x,
+            physical_resolution.y,
+            scale_factor,
+            scale_mode,
+            scaled_resolution.x,
+            scaled_resolution.y,
+            scale.scale_factor_logical(),
+        );
+
         // TODO: examine how much mem fonts take up and reduce clones if significant
         Ok(Self {
             renderer: IcedRenderer::new(
@@ -194,6 +206,13 @@ impl IcedUi {
             // Somewhat inefficient for elements that won't change size after a window
             // resize
             let physical_resolution = renderer.resolution();
+            tracing::info!(
+                "Iced UI resized: physical={}x{}, scaled={:.0}x{:.0}",
+                physical_resolution.x,
+                physical_resolution.y,
+                scaled_resolution.x,
+                scaled_resolution.y,
+            );
             if physical_resolution.map(|e| e > 0).reduce_and() {
                 self.renderer
                     .resize(scaled_resolution, physical_resolution, renderer);
