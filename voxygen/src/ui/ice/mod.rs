@@ -22,7 +22,7 @@ use crate::{
 };
 use common::slowjob::SlowJobPool;
 use common_base::span;
-use iced::{Cache, Size, UserInterface, mouse};
+use iced::{Cache, Size, UserInterface, mouse, touch};
 use vek::*;
 
 pub type Element<'a, M> = iced::Element<'a, M, IcedRenderer>;
@@ -127,6 +127,38 @@ impl IcedUi {
                         y: y / scale,
                     },
                 }));
+            },
+            // Touchscreens don't emit cursor movement, so keep the tracked cursor
+            // position in sync with touches: iced widgets (notably buttons)
+            // hit-test against it. Scale positions like cursor movement events.
+            Event::Touch(touch_event) => {
+                // TODO: return f32 here
+                let scale = self.scale.scale_factor_logical() as f32;
+                let scaled = |p: iced::Point| iced::Point::new(p.x / scale, p.y / scale);
+                let event = match touch_event {
+                    touch::Event::FingerPressed { id, position } => {
+                        let position = scaled(position);
+                        self.cursor_position = Vec2::new(position.x, position.y);
+                        touch::Event::FingerPressed { id, position }
+                    },
+                    touch::Event::FingerMoved { id, position } => {
+                        let position = scaled(position);
+                        self.cursor_position = Vec2::new(position.x, position.y);
+                        touch::Event::FingerMoved { id, position }
+                    },
+                    touch::Event::FingerLifted { id, position } => {
+                        let position = scaled(position);
+                        self.cursor_position = Vec2::new(position.x, position.y);
+                        touch::Event::FingerLifted { id, position }
+                    },
+                    touch::Event::FingerLost { id, position } => {
+                        touch::Event::FingerLost {
+                            id,
+                            position: scaled(position),
+                        }
+                    },
+                };
+                self.events.push(Event::Touch(event));
             },
             event => self.events.push(event),
         }
