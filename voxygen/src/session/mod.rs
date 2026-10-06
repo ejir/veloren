@@ -5,7 +5,7 @@ mod target;
 use std::{cell::RefCell, collections::HashSet, rc::Rc, result::Result, time::Duration};
 
 use itertools::Itertools;
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "android")))]
 use mumble_link::SharedLink;
 use ordered_float::OrderedFloat;
 use specs::WorldExt;
@@ -58,6 +58,8 @@ use hashbrown::HashMap;
 use interactable::{BlockInteraction, EntityInteraction, Interactable, get_interactables};
 use settings_change::Language::ChangeLanguage;
 use target::targets_under_cursor;
+#[cfg(target_os = "android")]
+use winit::event::TouchPhase;
 #[cfg(feature = "egui-ui")]
 use voxygen_egui::EguiDebugInfo;
 
@@ -88,6 +90,32 @@ enum TickAction {
     Disconnect,
 }
 
+#[cfg(target_os = "android")]
+#[derive(Clone, Copy)]
+enum AndroidTouchControl {
+    Move { origin: Vec2<f32> },
+    Look { last: Vec2<f32> },
+    Button(GameInput),
+}
+
+#[cfg(target_os = "android")]
+fn android_touch_button(position: Vec2<f32>, width: f32, height: f32) -> Option<GameInput> {
+    // Landscape touch layout for combat, movement, and interaction targets.
+    // The left half remains available for the movement stick and camera swipes.
+    let radius = height * 0.075;
+    [
+        (GameInput::Primary, Vec2::new(width * 0.90, height * 0.78)),
+        (GameInput::Secondary, Vec2::new(width * 0.76, height * 0.85)),
+        (GameInput::Jump, Vec2::new(width * 0.76, height * 0.66)),
+        (GameInput::Interact, Vec2::new(width * 0.90, height * 0.57)),
+        (GameInput::Roll, Vec2::new(width * 0.76, height * 0.47)),
+    ]
+    .into_iter()
+    .find_map(|(button, center)| {
+        ((position - center).magnitude_squared() <= radius * radius).then_some(button)
+    })
+}
+
 #[derive(Default)]
 pub struct PlayerDebugLines {
     pub chunk_normal: Option<DebugShapeId>,
@@ -104,6 +132,8 @@ pub struct SessionState {
     key_state: KeyState,
     inputs: comp::ControllerInputs,
     inputs_state: HashSet<GameInput>,
+    #[cfg(target_os = "android")]
+    android_touches: HashMap<u64, AndroidTouchControl>,
     selected_block: Block,
     walk_forward_dir: Vec2<f32>,
     walk_right_dir: Vec2<f32>,
@@ -118,7 +148,7 @@ pub struct SessionState {
     pub(crate) selected_entity: Option<(specs::Entity, std::time::Instant)>,
     pub(crate) viewpoint_entity: Option<specs::Entity>,
     interactables: interactable::Interactables,
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "android")))]
     mumble_link: SharedLink,
     hitboxes: HashMap<specs::Entity, DebugShapeId>,
     lines: PlayerDebugLines,
@@ -149,7 +179,7 @@ impl SessionState {
         client
             .borrow_mut()
             .set_lod_distance(global_state.settings.graphics.lod_distance);
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", target_os = "android")))]
         let mut mumble_link = SharedLink::new("veloren", "veloren-voxygen");
         {
             let mut client = client.borrow_mut();
@@ -157,7 +187,7 @@ impl SessionState {
             client.request_lossy_terrain_compression(
                 global_state.settings.networking.lossy_terrain_compression,
             );
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(not(any(target_os = "macos", target_os = "android")))]
             if let Some(uid) = client.uid() {
                 let identiy = if let Some(info) = client.player_list().get(&uid) {
                     format!("{}-{}", info.player_alias, uid)
@@ -178,6 +208,8 @@ impl SessionState {
             key_state: KeyState::default(),
             inputs: comp::ControllerInputs::default(),
             inputs_state: HashSet::new(),
+            #[cfg(target_os = "android")]
+            android_touches: HashMap::new(),
             hud,
             selected_block: Block::new(BlockKind::Misc, Rgb::broadcast(255)),
             walk_forward_dir,
@@ -193,7 +225,7 @@ impl SessionState {
             selected_entity: None,
             viewpoint_entity: None,
             interactables: Default::default(),
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(not(any(target_os = "macos", target_os = "android")))]
             mumble_link,
             hitboxes: HashMap::new(),
             metadata,
@@ -207,6 +239,127 @@ impl SessionState {
         self.auto_walk = false;
         self.hud.auto_walk(false);
         self.key_state.auto_walk = false;
+    }
+
+    #[cfg(target_os = "android")]
+    fn release_android_touches(&mut self, global_state: &mut GlobalState) {
+        for (_, control) in self.android_touches.drain() {
+            match control {
+                AndroidTouchControl::Move { .. } => {
+                    global_state.window.send_event(Event::AnalogGameInput(
+                        AnalogGameInput::MovementX(0.0),
+                    ));
+                    global_state.window.send_event(Event::AnalogGameInput(
+                        AnalogGameInput::MovementY(0.0),
+                    ));
+                },
+                AndroidTouchControl::Button(button) => global_state
+                    .window
+                    .send_event(Event::InputUpdate(button, false)),
+                AndroidTouchControl::Look { .. } => {},
+            }
+        }
+    }
+
+    #[cfg(target_os = "android")]
+    fn handle_android_touch(
+        &mut self,
+        id: u64,
+        phase: TouchPhase,
+        position: Vec2<f32>,
+        global_state: &mut GlobalState,
+    ) {
+        // The regular menu widgets receive their native touch events. Only use the
+        // virtual game controls while the game has grabbed the pointer.
+        if !global_state.window.is_cursor_grabbed() {
+            // A menu or interrupted gesture must not leave virtual input stuck.
+            self.release_android_touches(global_state);
+            return;
+        }
+
+        let size = global_state.window.window().inner_size();
+        let width = size.width as f32;
+        let height = size.height as f32;
+        if width <= 0.0 || height <= 0.0 {
+            return;
+        }
+
+        match phase {
+            TouchPhase::Started => {
+                let control = if let Some(button) = android_touch_button(position, width, height) {
+                    global_state
+                        .window
+                        .send_event(Event::InputUpdate(button, true));
+                    AndroidTouchControl::Button(button)
+                } else if position.x < width * 0.42 && position.y > height * 0.32 {
+                    global_state.window.send_event(Event::AnalogGameInput(
+                        AnalogGameInput::MovementX(0.0),
+                    ));
+                    global_state.window.send_event(Event::AnalogGameInput(
+                        AnalogGameInput::MovementY(0.0),
+                    ));
+                    AndroidTouchControl::Move { origin: position }
+                } else {
+                    AndroidTouchControl::Look { last: position }
+                };
+                self.android_touches.insert(id, control);
+            },
+            TouchPhase::Moved => {
+                if let Some(control) = self.android_touches.get_mut(&id) {
+                    match control {
+                        AndroidTouchControl::Move { origin } => {
+                            let radius = (height * 0.13).max(1.0);
+                            let mut axis = (position - *origin) / radius;
+                            if axis.magnitude_squared() < 0.01 {
+                                axis = Vec2::zero();
+                            } else if axis.magnitude_squared() > 1.0 {
+                                axis = axis.normalized();
+                            }
+                            global_state.window.send_event(Event::AnalogGameInput(
+                                AnalogGameInput::MovementX(axis.x),
+                            ));
+                            global_state.window.send_event(Event::AnalogGameInput(
+                                AnalogGameInput::MovementY(-axis.y),
+                            ));
+                        },
+                        AndroidTouchControl::Look { last } => {
+                            let delta = position - *last;
+                            *last = position;
+                            let sensitivity =
+                                global_state.settings.gameplay.pan_sensitivity as f32 / 100.0;
+                            let invert_y = if global_state.settings.gameplay.mouse_y_inversion {
+                                -1.0
+                            } else {
+                                1.0
+                            };
+                            global_state.window.send_event(Event::CursorPan(Vec2::new(
+                                delta.x * sensitivity,
+                                delta.y * sensitivity * invert_y,
+                            )));
+                        },
+                        AndroidTouchControl::Button(_) => {},
+                    }
+                }
+            },
+            TouchPhase::Ended | TouchPhase::Cancelled => {
+                if let Some(control) = self.android_touches.remove(&id) {
+                    match control {
+                        AndroidTouchControl::Move { .. } => {
+                            global_state.window.send_event(Event::AnalogGameInput(
+                                AnalogGameInput::MovementX(0.0),
+                            ));
+                            global_state.window.send_event(Event::AnalogGameInput(
+                                AnalogGameInput::MovementY(0.0),
+                            ));
+                        },
+                        AndroidTouchControl::Button(button) => global_state
+                            .window
+                            .send_event(Event::InputUpdate(button, false)),
+                        AndroidTouchControl::Look { .. } => {},
+                    }
+                }
+            },
+        }
     }
 
     /// Possibly lock the camera zoom depending on the current behaviour, and
@@ -264,7 +417,7 @@ impl SessionState {
         self.scene.maintain_debug_vectors(&client, &mut self.lines);
         let pos = client.position().unwrap_or_default();
 
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", target_os = "android")))]
         {
             // Update mumble positional audio
             let ori = client
@@ -768,20 +921,27 @@ impl PlayState for SessionState {
             // Handle window events.
             for event in events {
                 // Pass all events to the ui first.
-                {
+                let handled_by_hud = {
                     let client = self.client.borrow();
                     let inventories = client.inventories();
                     let inventory = inventories.get(client.entity());
-                    if self
-                        .hud
+                    self.hud
                         .handle_event(event.clone(), global_state, inventory)
-                    {
-                        continue;
-                    }
+                };
+                #[cfg(target_os = "android")]
+                if !global_state.window.is_cursor_grabbed() {
+                    self.release_android_touches(global_state);
+                }
+                if handled_by_hud {
+                    continue;
                 }
                 match event {
                     Event::Close => {
                         return PlayStateResult::Shutdown;
+                    },
+                    #[cfg(target_os = "android")]
+                    Event::Touch { id, phase, position } => {
+                        self.handle_android_touch(id, phase, position, global_state);
                     },
                     Event::InputUpdate(input, state)
                         if state != self.inputs_state.contains(&input) =>

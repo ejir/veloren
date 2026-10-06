@@ -7,28 +7,48 @@ use winit::{event::WindowEvent, keyboard::NamedKey};
 /// A buffer for short-term storage and transfer within and between
 /// applications.
 pub struct Clipboard {
+    #[cfg(not(target_os = "android"))]
     connection: Option<window_clipboard::Clipboard>,
 }
 
 impl Clipboard {
     /// Creates a new [`Clipboard`] for the given window.
     pub fn connect(window: &winit::window::Window) -> Clipboard {
-        #[expect(unsafe_code)]
-        let connection = unsafe { window_clipboard::Clipboard::connect(window) }.ok();
-
-        Clipboard { connection }
+        #[cfg(not(target_os = "android"))]
+        {
+            #[expect(unsafe_code)]
+            let connection = unsafe { window_clipboard::Clipboard::connect(window) }.ok();
+            Clipboard { connection }
+        }
+        #[cfg(target_os = "android")]
+        {
+            let _ = window;
+            Clipboard {}
+        }
     }
 
     /// Reads the current content of the [`Clipboard`] as text.
-    pub fn read(&self) -> Option<String> { self.connection.as_ref()?.read().ok() }
+    pub fn read(&self) -> Option<String> {
+        #[cfg(not(target_os = "android"))]
+        {
+            self.connection.as_ref()?.read().ok()
+        }
+        #[cfg(target_os = "android")]
+        {
+            None
+        }
+    }
 
     /// Writes the given text contents to the [`Clipboard`].
     pub fn write(&mut self, contents: String) {
+        #[cfg(not(target_os = "android"))]
         if let Some(clipboard) = &mut self.connection
             && let Err(error) = clipboard.write(contents)
         {
             tracing::warn!("error writing to clipboard: {}", error)
         }
+        #[cfg(target_os = "android")]
+        let _ = contents;
     }
 }
 

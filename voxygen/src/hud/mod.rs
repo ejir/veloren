@@ -341,6 +341,9 @@ widget_ids! {
         camera_clamp_txt,
         camera_clamp_bg,
 
+        // Android touch controls (the widgets are only allocated on Android)
+        android_touch_controls[],
+
         // Tutorial
         quest_bg,
         q_headline_bg,
@@ -4737,6 +4740,45 @@ impl Hud {
                 Intro::Never => {
                     self.show.intro = false;
                 },
+            }
+        }
+
+        #[cfg(target_os = "android")]
+        if self.show.ingame && self.show.want_grab {
+            const TOUCH_CONTROL_COUNT: usize = 12;
+            if self.ids.android_touch_controls.len() < TOUCH_CONTROL_COUNT {
+                self.ids.android_touch_controls.resize(
+                    TOUCH_CONTROL_COUNT,
+                    &mut ui_widgets.widget_id_generator(),
+                );
+            }
+
+            // The touch hit regions live in physical screen coordinates; these
+            // fractional positions keep the visual controls aligned at any density.
+            let controls = [
+                (0.20, 0.76, 0.34, "MOVE"),
+                (0.90, 0.78, 0.15, "ATK"),
+                (0.76, 0.85, 0.15, "ALT"),
+                (0.76, 0.66, 0.15, "JUMP"),
+                (0.90, 0.57, 0.15, "USE"),
+                (0.76, 0.47, 0.15, "ROLL"),
+            ];
+            for (index, (x, y, diameter, label)) in controls.into_iter().enumerate() {
+                let center = Vec2::new(
+                    (x - 0.5) * ui_widgets.win_w,
+                    (0.5 - y) * ui_widgets.win_h,
+                );
+                let size = ui_widgets.win_h * diameter;
+                Rectangle::fill([size, size])
+                    .rgba(0.04, 0.07, 0.09, 0.38)
+                    .x_y(center.x, center.y)
+                    .set(self.ids.android_touch_controls[index], ui_widgets);
+                Text::new(label)
+                    .font_id(self.fonts.cyri.conrod_id)
+                    .font_size(self.fonts.cyri.scale(18))
+                    .color(Color::Rgba(1.0, 1.0, 1.0, 0.8))
+                    .x_y(center.x, center.y)
+                    .set(self.ids.android_touch_controls[index + 6], ui_widgets);
             }
         }
 

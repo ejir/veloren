@@ -79,6 +79,11 @@ nix/result*
 ## Rust
 target
 
+## Android / Gradle
+/android/.gradle/
+/android/local.properties
+/android/app/build/
+
 
 # Shell extensions
 ## direnv

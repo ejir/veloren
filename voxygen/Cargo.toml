@@ -11,6 +11,10 @@ default-run = "veloren-voxygen"
 [lints]
 workspace = true
 
+[lib]
+name = "veloren_voxygen"
+crate-type = ["rlib", "cdylib"]
+
 [package.metadata.nix]
 build = true
 app = true
@@ -34,6 +38,8 @@ tracy-memory = ["tracy"]
 plugins = ["client/plugins", "server/plugins", "anim/plugins", "common/plugins"]
 egui-ui = ["voxygen-egui", "egui", "egui-wgpu", "egui-winit"]
 shaderc-from-source = ["shaderc/build-from-source"]
+# Android NativeActivity build: compile shaderc with the NDK instead of relying on a host library.
+android = ["shaderc-from-source"]
 discord = ["discord-sdk"]
 bin_cmd_doc_gen = []
 
@@ -64,7 +70,7 @@ i18n-helpers = { package = "veloren-voxygen-i18n-helpers", path = "i18n-helpers"
 voxygen-egui = { package = "veloren-voxygen-egui", path = "egui", optional = true }
 
 # Graphics
-winit = { version = "0.30.12", features = ["serde"] }
+winit = { version = "0.30.12", features = ["serde", "android-native-activity"] }
 wgpu = { version = "27", features = ["spirv", "glsl"] }
 wgpu-profiler = "0.25"
 bytemuck = { version = "1.7", features = ["derive"] }
@@ -76,7 +82,6 @@ euc = "0.5.3"
 # We should probably migrate to a more recent version at some point, but this is significant amount of work.
 # Note: this does not depend on the version of `winit` anymore, all dependent code was moved into Voxygen
 iced = { package = "iced_native", git = "https://github.com/Imberflur/iced", tag = "veloren-winit-0.28" }
-window_clipboard = "0.5"
 glyph_brush = "0.7.0"
 # EGUI
 egui = { version = "0.33", optional = true }
@@ -146,6 +151,12 @@ discord-sdk = { version = "0.4", optional = true }
 enum-map = { workspace = true }
 cpal = "0.18"
 
+[target.'cfg(not(target_os = "android"))'.dependencies]
+window_clipboard = "0.5"
+
+[target.'cfg(target_os = "android")'.dependencies]
+ndk = "0.9.0"
+
 [target.'cfg(target_os = "macos")'.dependencies]
 dispatch = "0.2"
 
@@ -156,7 +167,7 @@ winres = "0.1"
 mimalloc = { workspace = true }
 
 # Mumble
-[target.'cfg(not(target_os="macos"))'.dependencies]
+[target.'cfg(all(not(target_os = "macos"), not(target_os = "android")))'.dependencies]
 mumble-link = "0.2.0"
 
 [dev-dependencies]

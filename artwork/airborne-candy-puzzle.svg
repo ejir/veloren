@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1920 1440" role="img" aria-labelledby="title desc">
+  <title id="title">鹈鹕的空中糖果题：保证取出29颗</title>
+  <desc id="desc">一只张开翅膀的鹈鹕骑着自行车，驮着秦始皇的北极熊，在孙悟空驾驶的大型飞机机翼上飞行。鹈鹕公布糖果题答案：至少取出29颗。</desc>
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1">
+      <stop offset="0" stop-color="#78c7e6"/>
+      <stop offset=".42" stop-color="#b9e4eb"/>
+      <stop offset=".73" stop-color="#f4dfb5"/>
+      <stop offset="1" stop-color="#ffc77f"/>
+    </linearGradient>
+    <radialGradient id="sunGlow">
+      <stop stop-color="#fff8d1" stop-opacity=".95"/>
+      <stop offset=".32" stop-color="#ffe4a2" stop-opacity=".56"/>
+      <stop offset="1" stop-color="#ffd88d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cloud" x2="0" y2="1">
+      <stop stop-color="#fffef7"/>
+      <stop offset="1" stop-color="#d8edf0"/>
+    </linearGradient>
+    <linearGradient id="speech" x2="0" y2="1">
+      <stop stop-color="#fffefa"/>
+      <stop offset="1" stop-color="#f6fbf7"/>
+    </linearGradient>
+    <linearGradient id="gold" x2="0" y2="1">
+      <stop stop-color="#fff1a9"/>
+      <stop offset=".42" stop-color="#e5ae42"/>
+      <stop offset="1" stop-color="#b97028"/>
+    </linearGradient>
+    <linearGradient id="answerGold" x2="0" y2="1">
+      <stop stop-color="#fff2be"/>
+      <stop offset="1" stop-color="#f4d080"/>
+    </linearGradient>
+    <linearGradient id="metal" x2=".8" y2="1">
+      <stop stop-color="#fbffff"/>
+      <stop offset=".25" stop-color="#c9d9df"/>
+      <stop offset=".55" stop-color="#eff6f4"/>
+      <stop offset="1" stop-color="#8ea7b5"/>
+    </linearGradient>
+    <linearGradient id="wingMetal" x1="0" y1="0" x2=".9" y2="1">
+      <stop stop-color="#e9f4f2"/>
+      <stop offset=".22" stop-color="#b9d0d7"/>
+      <stop offset=".5" stop-color="#f6f3e4"/>
+      <stop offset=".77" stop-color="#92afbd"/>
+      <stop offset="1" stop-color="#d7e1dc"/>
+    </linearGradient>
+    <linearGradient id="window" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#102f54"/>
+      <stop offset=".42" stop-color="#4e9bb7"/>
+      <stop offset=".72" stop-color="#bde7e4"/>
+      <stop offset="1" stop-color="#2f607f"/>
+    </linearGradient>
+    <linearGradient id="beak" x2=".2" y2="1">
+      <stop stop-color="#ffd66e"/>
+      <stop offset=".48" stop-color="#f49235"/>
+      <stop offset="1" stop-color="#d95736"/>
+    </linearGradient>
+    <linearGradient id="pouch" x2=".25" y2="1">
+      <stop stop-color="#ffb44b"/>
+      <stop offset=".6" stop-color="#ef6940"/>
+      <stop offset="1" stop-color="#b7393b"/>
+    </linearGradient>
+    <linearGradient id="feather" x2=".6" y2="1">
+      <stop stop-color="#fffef5"/>
+      <stop offset=".55" stop-color="#dbe5de"/>
+      <stop offset="1" stop-color="#a9c2c5"/>
+    </linearGradient>
+    <linearGradient id="fur" x2=".2" y2="1">
+      <stop stop-color="#fffef4"/>
+      <stop offset=".55" stop-color="#f3f3e8"/>
+      <stop offset="1" stop-color="#d7e2dc"/>
+    </linearGradient>
+    <linearGradient id="robe" x2=".8" y2="1">
+      <stop stop-color="#e7593f"/>
+      <stop offset=".46" stop-color="#9e2934"/>
+      <stop offset="1" stop-color="#4a2739"/>
+    </linearGradient>
+    <linearGradient id="appleCandy" x2=".9" y2="1">
+      <stop stop-color="#ffc8a4"/>
+      <stop offset=".3" stop-color="#ed574d"/>
+      <stop offset="1" stop-color="#963540"/>
+    </linearGradient>
+    <linearGradient id="peachCandy" x2=".9" y2="1">
+      <stop stop-color="#fff0bb"/>
+      <stop offset=".45" stop-color="#f6a45e"/>
+      <stop offset="1" stop-color="#dc6650"/>
+    </linearGradient>
+    <linearGradient id="bikePaint" x2="0" y2="1">
+      <stop stop-color="#f5bb57"/>
+      <stop offset=".5" stop-color="#ed6e42"/>
+      <stop offset="1" stop-color="#9a3541"/>
+    </linearGradient>
+    <radialGradient id="wheelHub">
+      <stop stop-color="#fff9dd"/>
+      <stop offset=".35" stop-color="#e4aa4f"/>
+      <stop offset="1" stop-color="#46596a"/>
+    </radialGradient>
+    <pattern id="tinyDots" width="18" height="18" patternUnits="userSpaceOnUse">
+      <circle cx="3" cy="3" r="1.2" fill="#fff" opacity=".25"/>
+    </pattern>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="12" result="blur"/>
+      <feOffset dy="12" result="offset"/>
+      <feColorMatrix in="offset" type="matrix" values="0 0 0 0 0.09 0 0 0 0 0.20 0 0 0 0 0.29 0 0 0 .24 0" result="shadow"/>
+      <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="smallShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="blur"/>
+      <feOffset dy="5" result="offset"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".26"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="cockpitClip">
+      <path d="M1552 730 C1601 685 1680 646 1739 645 Q1778 646 1788 672 Q1795 696 1767 720 L1667 779 Q1615 800 1573 776 Q1554 764 1552 730Z"/>
+    </clipPath>
+    <g id="starCandy">
+      <path d="M0-18 5.3-6.2 18-5.6 8.2 2.9 11.4 15.8 0 9.1-11.4 15.8-8.2 2.9-18-5.6-5.3-6.2Z"/>
+    </g>
+    <g id="miniStar">
+      <path d="M0-12 3.5-4.1 12-3.7 5.5 1.9 7.6 10.5 0 6.1-7.6 10.5-5.5 1.9-12-3.7-3.5-4.1Z"/>
+    </g>
+  </defs>
+
+  <!-- A high-altitude, late-afternoon sky -->
+  <rect width="1920" height="1440" fill="url(#sky)"/>
+  <circle cx="1694" cy="265" r="310" fill="url(#sunGlow)"/>
+  <g opacity=".55" fill="none" stroke="#fff7d8" stroke-linecap="round">
+    <path d="M1467 220 Q1551 189 1654 205" stroke-width="3"/>
+    <path d="M1492 244 Q1599 214 1717 233" stroke-width="2"/>
+    <path d="M1580 170 Q1652 154 1739 169" stroke-width="2"/>
+  </g>
+  <circle cx="1745" cy="292" r="77" fill="#fff4c7" opacity=".72"/>
+  <circle cx="1745" cy="292" r="51" fill="#ffe9a8" opacity=".65"/>
+  <g fill="#fffef5" opacity=".72">
+    <path d="M40 594c20-31 62-33 82-6 20-44 81-43 99 3 46-6 66 39 40 69H30c-27-19-17-52 10-66Z"/>
+    <path d="M1591 497c15-31 52-35 74-10 20-44 77-41 90 4 43-2 59 40 33 67h-213c-24-20-13-49 16-61Z"/>
+    <path d="M1740 839c15-27 47-28 65-6 17-35 66-34 80 4 35-2 49 34 28 56h-190c-20-17-11-43 17-54Z"/>
+  </g>
+  <g fill="#f5ffff" opacity=".47">
+    <path d="M22 686c90-32 185-21 282 6-82-4-164 15-231 28Z"/>
+    <path d="M1580 574c77-21 178-4 269 28-104-14-177 4-242 23Z"/>
+    <path d="M1520 873c108-26 213-9 307 27-102-12-197 13-283 34Z"/>
+  </g>
+  <g fill="#fff7cf" opacity=".8">
+    <path d="M1572 316l7 19 20 1-15 12 5 19-17-11-17 11 6-19-15-12 20-1Z"/>
+    <circle cx="1545" cy="361" r="4"/><circle cx="1820" cy="408" r="5"/>
+    <circle cx="1872" cy="324" r="3"/><circle cx="1510" cy="296" r="3"/>
+  </g>
+  <g opacity=".35" stroke="#fffdf1" stroke-linecap="round">
+    <path d="M93 889l148-49M125 918l112-35M1707 950l134-42M1640 985l104-32" stroke-width="5"/>
+  </g>
+
+  <!-- The big aircraft: tail, fuselage and glazed cockpit -->
+  <g filter="url(#smallShadow)">
+    <path d="M1375 782 1292 686q-10-12 6-17l27 2 105 90-10 43Z" fill="#829eae" stroke="#29445a" stroke-width="6" stroke-linejoin="round"/>
+    <path d="m1324 697 32 4 63 58-24 8Z" fill="#d9e6e4" opacity=".86"/>
+    <path d="M1361 796 1240 814l54 43 115-25Z" fill="#9bb0b8" stroke="#29445a" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M1229 806c96-39 199-92 340-151 81-34 173-61 231-32 52 26 67 71 41 108-23 32-76 52-141 69l-193 67c-47 16-83 13-116-6l-137-31Z" fill="url(#metal)" stroke="#29445a" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M1248 807c131-50 275-117 400-164 68-26 120-33 166-14" fill="none" stroke="#fffdf3" stroke-width="8" opacity=".8"/>
+    <path d="M1416 836c94-26 187-59 278-90" fill="none" stroke="#7895a4" stroke-width="4" opacity=".8"/>
+    <path d="M1775 636q91-28 137 14 18 16 17 41-30-12-58-2l-118 41q35-45 22-94Z" fill="#eff3e7" stroke="#29445a" stroke-width="6"/>
+    <path d="M1780 645q67-21 100 3" fill="none" stroke="#fff" stroke-width="5" opacity=".8"/>
+    <path d="M1778 735q56-23 101-39" fill="none" stroke="#bb7c35" stroke-width="5" opacity=".85"/>
+    <circle cx="1885" cy="694" r="8" fill="#db4d3d" stroke="#fff4d0" stroke-width="3"/>
+    <path d="M1298 784q76-12 117 21" fill="none" stroke="#668697" stroke-width="5"/>
+  </g>
+
+  <!-- Sun Wukong at the controls -->
+  <g clip-path="url(#cockpitClip)">
+    <path d="M1573 750q25-49 68-51 52 0 79 47l8 42-164 43Z" fill="#a73338"/>
+    <path d="M1597 747q31 20 64 4l23 57-111 25Z" fill="#e45c3f"/>
+    <path d="M1609 768q-21 1-35 20l30 15 24-17ZM1705 759q23 7 39 29l-27 13-26-17Z" fill="#c37c39" stroke="#552f38" stroke-width="4"/>
+    <path d="M1632 716q-15-22-8-46 9-31 43-34 36-3 49 29 9 24-3 51-12 27-41 30-27 2-40-30Z" fill="#975934" stroke="#512f34" stroke-width="5"/>
+    <path d="M1627 682q3-37 42-47 39 6 51 38-33-15-93 9Z" fill="#59372f"/>
+    <ellipse cx="1618" cy="683" rx="14" ry="21" fill="#9c5b38" stroke="#512f34" stroke-width="4"/>
+    <ellipse cx="1701" cy="679" rx="14" ry="20" fill="#9c5b38" stroke="#512f34" stroke-width="4"/>
+    <ellipse cx="1666" cy="688" rx="28" ry="31" fill="#c9824b"/>
+    <path d="M1644 681q10-7 19 0M1671 679q10-7 18 1" fill="none" stroke="#382b2b" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="1653" cy="686" r="3.7" fill="#fff4d6"/><circle cx="1681" cy="684" r="3.7" fill="#fff4d6"/>
+    <ellipse cx="1668" cy="703" rx="20" ry="12" fill="#f1c18b"/>
+    <path d="m1660 698 9-4 7 5-8 6Z" fill="#3a3031"/>
+    <path d="M1635 658q30 12 64-1" fill="none" stroke="#e8b53e" stroke-width="8"/>
+    <path d="M1646 651q16-24 34-21 8 7 0 21" fill="#e0ad37" stroke="#70462a" stroke-width="4"/>
+    <path d="M1657 652q-7-15-17-21M1673 651q8-19 18-22" fill="none" stroke="#f7d264" stroke-width="5" stroke-linecap="round"/>
+    <path d="M1628 785q20-23 40-10l15 25-54 17Z" fill="#e7a33c" stroke="#714034" stroke-width="4"/>
+    <path d="M1679 789q28-22 49 3l-24 20-29-3Z" fill="#e7a33c" stroke="#714034" stroke-width="4"/>
+    <path d="M1613 814q57-23 118-13" fill="none" stroke="#314b5c" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="1645" cy="803" r="6" fill="#f5d06b"/><circle cx="1706" cy="802" r="6" fill="#f5d06b"/>
+    <path d="M1586 739q22-36 53-47M1714 719l51-39" fill="none" stroke="#d3f7f3" stroke-width="9" opacity=".24"/>
+  </g>
+  <path d="M1552 730 C1601 685 1680 646 1739 645 Q1778 646 1788 672 Q1795 696 1767 720 L1667 779 Q1615 800 1573 776 Q1554 764 1552 730Z" fill="url(#window)" fill-opacity=".18" stroke="#27495d" stroke-width="8"/>
+  <path d="M1569 728q84-67 160-82" fill="none" stroke="#fff" stroke-width="7" opacity=".64" stroke-linecap="round"/>
+  <path d="M1580 750q26 16 53 10" fill="none" stroke="#d6f7f3" stroke-width="4" opacity=".6"/>
+  <g transform="rotate(-12 1800 767)">
+    <rect x="1722" y="746" width="166" height="38" rx="17" fill="#fff7dc" stroke="#aa6938" stroke-width="3"/>
+    <text x="1805" y="773" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="21" font-weight="800" fill="#293f50">悟空号 · 机长</text>
+  </g>
+
+  <!-- Vast wing beneath the impossible bicycle parade -->
+  <path d="M1458 794 C1498 780 1535 801 1559 842 L1814 1229 C1850 1284 1810 1320 1744 1312 L384 1135 C322 1127 319 1082 379 1057 L1389 800 Q1425 789 1458 794Z" fill="#405e70" opacity=".24" transform="translate(0 20)"/>
+  <path d="M1458 794 C1498 780 1535 801 1559 842 L1814 1229 C1850 1284 1810 1320 1744 1312 L384 1135 C322 1127 319 1082 379 1057 L1389 800 Q1425 789 1458 794Z" fill="url(#wingMetal)" stroke="#29445a" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M1402 812 397 1074 386 1090 408 1105 1438 835Z" fill="#fffdf3" opacity=".38"/>
+  <path d="M391 1115 1746 1292" fill="none" stroke="#5c7a89" stroke-width="7" opacity=".68"/>
+  <path d="M1468 818 1777 1264" fill="none" stroke="#fffdf4" stroke-width="6" opacity=".72"/>
+  <path d="M532 1096 715 1120M1200 1178 1500 1219M887 966 946 1193M1092 914 1160 1209" fill="none" stroke="#718b96" stroke-width="3" opacity=".48"/>
+  <path d="M421 1080 1428 818" fill="none" stroke="#738e98" stroke-width="3" stroke-dasharray="14 14" opacity=".56"/>
+  <g fill="#496779" opacity=".73">
+    <circle cx="453" cy="1084" r="5"/><circle cx="508" cy="1070" r="5"/><circle cx="563" cy="1056" r="5"/><circle cx="618" cy="1042" r="5"/>
+    <circle cx="673" cy="1028" r="5"/><circle cx="728" cy="1014" r="5"/><circle cx="783" cy="1000" r="5"/><circle cx="838" cy="986" r="5"/>
+    <circle cx="893" cy="972" r="5"/><circle cx="948" cy="958" r="5"/><circle cx="1003" cy="944" r="5"/><circle cx="1058" cy="930" r="5"/>
+    <circle cx="1113" cy="916" r="5"/><circle cx="1168" cy="902" r="5"/><circle cx="1223" cy="888" r="5"/><circle cx="1278" cy="874" r="5"/>
+    <circle cx="1333" cy="860" r="5"/><circle cx="1388" cy="846" r="5"/>
+  </g>
+  <g transform="rotate(8 665 1137)">
+    <circle cx="665" cy="1137" r="40" fill="#f0c15d" stroke="#31536a" stroke-width="5"/>
+    <circle cx="665" cy="1137" r="31" fill="#a64240" stroke="#fff1c3" stroke-width="3"/>
+    <path d="M665 1119l5 12 13 1-10 8 4 13-12-7-12 7 4-13-10-8 13-1Z" fill="#fff0bb"/>
+    <text x="722" y="1145" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="23" font-weight="900" fill="#314e60">筋斗云航空</text>
+  </g>
+  <g fill="#f4c24e" stroke="#314e60" stroke-width="4">
+    <circle cx="362" cy="1085" r="13"/><circle cx="1785" cy="1282" r="12"/>
+  </g>
+  <g fill="#fff7d2" opacity=".92">
+    <circle cx="362" cy="1085" r="6"/><circle cx="1785" cy="1282" r="5"/>
+  </g>
+  <path d="M1660 1120q46 16 87 55" fill="none" stroke="#fffdf4" stroke-width="5" opacity=".5"/>
+
+  <!-- A small screw fixed into the wing, where the emperor is working -->
+  <g filter="url(#smallShadow)">
+    <ellipse cx="1532" cy="881" rx="29" ry="17" fill="#243b4d" opacity=".28"/>
+    <ellipse cx="1530" cy="873" rx="24" ry="15" fill="url(#gold)" stroke="#714a2b" stroke-width="4"/>
+    <path d="M1516 872l28 2M1530 861l-1 24" stroke="#6a472c" stroke-width="4" stroke-linecap="round"/>
+    <path d="M1509 859l-5-13M1551 856l8-12M1557 885l14 4" stroke="#e1a63d" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <!-- Bicycle shadow, hand-built bicycle wheels, spokes and frame -->
+  <ellipse cx="993" cy="1191" rx="296" ry="37" fill="#263f55" opacity=".18" filter="url(#glow)"/>
+  <g fill="none" stroke-linecap="round">
+    <g transform="translate(835 1107)">
+      <circle r="86" stroke="#213649" stroke-width="20"/>
+      <circle r="74" stroke="#e8f1e9" stroke-width="4"/>
+      <g stroke="#536c79" stroke-width="2.5" opacity=".84">
+        <path d="M0-72V72M-72 0H72M-51-51 51 51M51-51-51 51"/>
+        <path d="M-28-67 28 67M28-67-28 67M-67-28 67 28M67-28-67 28"/>
+      </g>
+      <circle r="13" fill="url(#wheelHub)" stroke="#243d52" stroke-width="4"/>
+      <circle cx="-32" cy="-78" r="5" fill="#f5c553" stroke="none"/>
+      <path d="M-42-76q20-15 39-11" stroke="#fff" stroke-width="4" opacity=".8"/>
+    </g>
+    <g transform="translate(1150 1107)">
+      <circle r="86" stroke="#213649" stroke-width="20"/>
+      <circle r="74" stroke="#e8f1e9" stroke-width="4"/>
+      <g stroke="#536c79" stroke-width="2.5" opacity=".84">
+        <path d="M0-72V72M-72 0H72M-51-51 51 51M51-51-51 51"/>
+        <path d="M-28-67 28 67M28-67-28 67M-67-28 67 28M67-28-67 28"/>
+      </g>
+      <circle r="13" fill="url(#wheelHub)" stroke="#243d52" stroke-width="4"/>
+      <circle cx="31" cy="-79" r="5" fill="#f5c553" stroke="none"/>
+      <path d="M-37-76q20-15 41-11" stroke="#fff" stroke-width="4" opacity=".8"/>
+    </g>
+  </g>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke="#20394f" stroke-width="18">
+      <path d="M835 1107 930 985 1006 1107 835 1107M1006 1107 1080 980 1150 1107M930 985 1080 980"/>
+      <path d="M835 1107 1006 1107" stroke-width="8"/>
+      <path d="M930 985 921 965M905 963h47" stroke-width="13"/>
+      <path d="M1080 980 1106 957M1098 952l54 1" stroke-width="12"/>
+    </g>
+    <g stroke="url(#bikePaint)" stroke-width="9">
+      <path d="M835 1107 930 985 1006 1107 835 1107M1006 1107 1080 980 1150 1107M930 985 1080 980"/>
+      <path d="M835 1107 1006 1107" stroke-width="5"/>
+      <path d="M930 985 921 965M905 963h47M1080 980 1106 957M1098 952l54 1" stroke-width="7"/>
+    </g>
+    <circle cx="1006" cy="1107" r="30" stroke="#2b4558" stroke-width="8"/>
+    <circle cx="1006" cy="1107" r="24" stroke="#f2c458" stroke-width="5" stroke-dasharray="4 6"/>
+    <path d="M1006 1107l-32-34M1006 1107l38 30" stroke="#233c50" stroke-width="10"/>
+    <path d="M962 1071h27M1031 1139h29" stroke="#f3c150" stroke-width="8"/>
+    <path d="M1093 972q24-23 44-10M1118 963l26 5" stroke="#1d374a" stroke-width="8"/>
+  </g>
+  <path d="M1063 979q25-16 50-3l5 9q-25 8-48 4Z" fill="#273b4d" stroke="#e9ad4b" stroke-width="4"/>
+  <path d="M909 958q18-12 48 0l-4 11h-42Z" fill="#563d42" stroke="#dca546" stroke-width="4"/>
+
+  <!-- Pelican's broad wings: the right one is a living perch for the bear -->
+  <g stroke="#435c6b" stroke-width="5" stroke-linejoin="round">
+    <path d="M1005 855Q927 815 858 790 788 758 730 782L676 814Q722 819 752 849 707 859 687 894 758 897 807 878 843 916 907 925L1009 905Z" fill="url(#feather)"/>
+    <path d="M1019 855Q1080 824 1155 801 1232 771 1304 792L1384 814Q1410 824 1424 850L1374 847Q1400 871 1398 894 1347 890 1310 872 1272 913 1212 923L1075 910Z" fill="url(#feather)"/>
+  </g>
+  <g fill="none" stroke="#879fa5" stroke-width="4" stroke-linecap="round" opacity=".88">
+    <path d="M1005 864Q911 832 768 796M1002 874Q893 853 713 829M990 886Q866 880 702 882M1000 891Q911 901 812 890"/>
+    <path d="M1035 867Q1153 824 1366 824M1034 878Q1178 849 1390 858M1040 892Q1172 886 1382 887M1053 902Q1162 914 1308 879"/>
+  </g>
+  <g fill="#fffdf5" opacity=".62">
+    <path d="M739 807q68-21 112 6l-51 17Z"/><path d="M1212 808q62-22 112 5l-62 13Z"/>
+  </g>
+  <path d="M1072 872q112-55 257-45" fill="none" stroke="#c9913d" stroke-width="5" stroke-dasharray="9 9" opacity=".86"/>
+
+  <!-- Pelican body and cycling legs -->
+  <path d="M982 888q-38 59-37 115 3 50 51 67 53-5 78-52l-10-109q-8-45-45-55-25-1-37 34Z" fill="url(#feather)" stroke="#354e60" stroke-width="7"/>
+  <path d="M976 930q43-33 95-4l4 54q-49 29-96 2Z" fill="#fffdf4" opacity=".78"/>
+  <path d="M985 1000q-10 39 2 61M1037 1007q16 31 20 58" fill="none" stroke="#d66f3b" stroke-width="11" stroke-linecap="round"/>
+  <path d="M983 1060q-13 7-22 11 11 12 38 6l9-13ZM1054 1059q12 2 25 4-3 16-31 15l-15-10Z" fill="#ed8a38" stroke="#783f39" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M972 1067l-11 8M985 1072l-8 9M1062 1069l9 7M1050 1072l-4 10" stroke="#ffe09b" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Qin Shi Huang's polar bear, standing on the outstretched wing -->
+  <g filter="url(#smallShadow)">
+    <path d="M1270 831q-4-42 34-63 36-22 95-8 39 8 64 35l-5 46q-35 32-109 29-55-2-79-39Z" fill="url(#fur)" stroke="#526976" stroke-width="6"/>
+    <path d="M1291 838q-10 19-4 39 8 13 23 2l11-34M1340 849q-8 17-2 34 9 13 23 2l8-32M1396 845q-5 18 2 32 12 9 21-4l1-32M1431 828q-2 18 8 30 12 7 19-8l-4-32" fill="#f3f2e7" stroke="#596d75" stroke-width="5" stroke-linecap="round"/>
+    <path d="M1397 777q4-43 42-53 38 7 49 39 8 25-13 49-20 22-53 6-26-12-25-41Z" fill="url(#fur)" stroke="#526976" stroke-width="6"/>
+    <circle cx="1410" cy="731" r="13" fill="#f6f0df" stroke="#526976" stroke-width="5"/>
+    <circle cx="1467" cy="726" r="12" fill="#f6f0df" stroke="#526976" stroke-width="5"/>
+    <ellipse cx="1480" cy="768" rx="23" ry="17" fill="#fff8e9" stroke="#8b9a96" stroke-width="3"/>
+    <ellipse cx="1494" cy="760" rx="10" ry="8" fill="#29343a"/>
+    <circle cx="1454" cy="754" r="4" fill="#31414b"/>
+    <path d="M1478 782q-8 9-18 1" fill="none" stroke="#8c6052" stroke-width="3" stroke-linecap="round"/>
+    <path d="M1293 796q47 20 98 4l28 35q-66 37-130 2Z" fill="#a83b3b" stroke="#dcb454" stroke-width="5"/>
+    <path d="M1314 819l13 3 6 12-14 4-9-10ZM1361 820l13 2 6 12-14 4-8-10Z" fill="#edcf79"/>
+    <path d="M1288 833q64 29 133-2" fill="none" stroke="#fbdf8b" stroke-width="4"/>
+    <path d="M1392 796q23 4 39 17" fill="none" stroke="#fff" stroke-width="5" opacity=".8"/>
+  </g>
+
+  <!-- The First Emperor rides the bear and drives a screw -->
+  <g>
+    <path d="M1325 698q-22 15-30 48l-12 45q29 19 72 5 32-21 46-58l-19-47Z" fill="url(#robe)" stroke="#4c2d39" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M1331 702l29 4 13 79-26 9-26-12 12-40Z" fill="#efb54d" stroke="#6e3b36" stroke-width="4"/>
+    <path d="M1340 715l18 1 4 55-19 5Z" fill="#a8393b"/>
+    <path d="M1327 758q32 17 72-4" fill="none" stroke="#f4d57c" stroke-width="6"/>
+    <rect x="1344" y="752" width="55" height="24" rx="5" fill="#3c3940" stroke="#e8bd5c" stroke-width="3" transform="rotate(-9 1371 764)"/>
+    <text x="1371" y="769" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="12.5" font-weight="900" fill="#fff1bd">秦始皇</text>
+    <path d="M1332 705q-30 3-43 31l23 20 33-22ZM1381 705q27-10 42 7l-7 26-38-9Z" fill="#bf4040" stroke="#71363a" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M1388 717q25 18 53 44" fill="none" stroke="#d7a253" stroke-width="15" stroke-linecap="round"/>
+    <path d="M1434 757q10 7 16 1 5-9-4-16" fill="none" stroke="#d99b63" stroke-width="13" stroke-linecap="round"/>
+    <path d="M1343 657q4-35 31-39 33 3 38 38l-8 34q-17 22-45 5-19-13-16-38Z" fill="#c88a57" stroke="#55343a" stroke-width="5"/>
+    <path d="M1344 658q12-16 29-9 16-7 37 1l-6-26-51-2Z" fill="#322c36"/>
+    <path d="M1334 637l9-20 62-1 12 21-9 15h-66Z" fill="#272b35" stroke="#d3a84e" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M1345 628h57" stroke="#f0cb70" stroke-width="4"/>
+    <path d="M1344 647v24M1351 650v29M1397 650v27M1405 646v21" stroke="#d8b25c" stroke-width="3"/>
+    <circle cx="1344" cy="674" r="3" fill="#f7e6ac"/><circle cx="1351" cy="679" r="3" fill="#f7e6ac"/>
+    <circle cx="1397" cy="677" r="3" fill="#f7e6ac"/><circle cx="1405" cy="671" r="3" fill="#f7e6ac"/>
+    <path d="M1352 675q8-5 15 0M1380 674q8-4 15 1" fill="none" stroke="#372b30" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="1361" cy="681" r="3" fill="#fff4d7"/><circle cx="1389" cy="681" r="3" fill="#fff4d7"/>
+    <path d="M1366 690q11 7 22 0" fill="none" stroke="#66413c" stroke-width="3"/>
+    <path d="M1363 700q10 15 25 0" fill="none" stroke="#5a3035" stroke-width="5" stroke-linecap="round"/>
+    <path d="M1348 700q21 13 48 0" fill="none" stroke="#efc653" stroke-width="8"/>
+  </g>
+  <!-- Hand drill, angled to the screw -->
+  <g transform="translate(1450 770) rotate(-37)" filter="url(#smallShadow)">
+    <path d="M-25-47q6-15 27-15l39 10q12 4 10 21L42-5 6 3l-29-18Z" fill="#d94636" stroke="#532e35" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M-17-45 35-32M-14-34 36-23" stroke="#f7bc51" stroke-width="5"/>
+    <path d="M14-5 42-4 36 36 9 43-4 14Z" fill="#334b5a" stroke="#233747" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M8 7 31 12M7 19 29 24" stroke="#849ba0" stroke-width="4"/>
+    <path d="M18 39 18 132" stroke="#d7e2df" stroke-width="8"/>
+    <path d="M18 39 18 132" stroke="#728a91" stroke-width="2"/>
+    <path d="M8 132h20l-10 13Z" fill="#b6c8c4" stroke="#435b65" stroke-width="3"/>
+    <circle cx="-11" cy="-38" r="6" fill="#ffe7a6"/>
+  </g>
+  <g fill="none" stroke="#f4ba4b" stroke-width="5" stroke-linecap="round" opacity=".9">
+    <path d="M1485 823q-1-18 14-27M1497 833q15-10 29-5M1480 811q4-18 18-24"/>
+  </g>
+
+  <!-- Pelican neck, head, cycling helmet and signature bill -->
+  <path d="M1008 914q41-41 27-91-9-35-44-45-24-5-37 19-10 24 13 48 19 20 6 44l-21 41Z" fill="#fffdf4" stroke="#405666" stroke-width="6"/>
+  <path d="M978 871q13 22 42 20" fill="none" stroke="#e2a35e" stroke-width="10" stroke-linecap="round"/>
+  <path d="M970 786q-19-33-7-61 12-34 49-35 40-1 57 31 16 30-2 64-14 26-44 30-35 3-53-29Z" fill="url(#feather)" stroke="#354e60" stroke-width="7"/>
+  <path d="M972 737q15-48 55-50 34 0 49 28-43-12-104 22Z" fill="#2f526c" stroke="#253c52" stroke-width="5"/>
+  <path d="M972 715q18-27 50-28 32-1 50 24l9 18q-53-20-111 14Z" fill="#4b8296" stroke="#253c52" stroke-width="4"/>
+  <path d="M1007 691q1 31 8 45M1047 694q-4 24-1 38" fill="none" stroke="#9ac6c9" stroke-width="4"/>
+  <path d="M990 757q10-13 24 0M1033 752q10-11 21 2" fill="none" stroke="#293f4c" stroke-width="5" stroke-linecap="round"/>
+  <ellipse cx="1004" cy="766" rx="4" ry="5" fill="#203b4d"/><ellipse cx="1045" cy="764" rx="4" ry="5" fill="#203b4d"/>
+  <circle cx="1005" cy="764" r="1.7" fill="#fff"/><circle cx="1046" cy="762" r="1.7" fill="#fff"/>
+  <path d="M990 777q29 10 59 0" fill="none" stroke="#c99d73" stroke-width="3"/>
+  <!-- Bill and the unmistakable pelican pouch -->
+  <path d="M983 759Q916 743 824 771q63 31 161 23 17-9 4-27Z" fill="url(#beak)" stroke="#743f36" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M980 784Q916 783 849 810q-28 18-40 53 70 11 142-25 33-16 44-39Z" fill="url(#pouch)" stroke="#743f36" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M837 855q57-4 109-31" fill="none" stroke="#ffc879" stroke-width="5" opacity=".72" stroke-linecap="round"/>
+  <path d="M846 784q57 12 110 10" fill="none" stroke="#fff0af" stroke-width="4" opacity=".72"/>
+  <circle cx="982" cy="778" r="4" fill="#362e30"/>
+  <g fill="none" stroke="#ee8a39" stroke-linecap="round">
+    <path d="M854 739q-15-14-29-9" stroke-width="5"/><path d="M837 725l-8-12" stroke-width="4"/>
+  </g>
+  <path d="M965 781q-24 4-44 16" fill="none" stroke="#e8bf82" stroke-width="3" opacity=".7"/>
+
+  <!-- Little open black candy sack in the bicycle basket -->
+  <g filter="url(#smallShadow)">
+    <path d="M1120 1002q31-19 65 2l-5 54q-32 18-62-1Z" fill="#24303a" stroke="#192b39" stroke-width="5"/>
+    <path d="M1118 1006q35 13 69 0l-1 15q-34 14-67 0Z" fill="#101c29" stroke="#d6aa4f" stroke-width="3"/>
+    <path d="M1133 1001q-8-18 4-28 13-10 24 3l11 27" fill="none" stroke="#282e38" stroke-width="6"/>
+    <circle cx="1136" cy="1002" r="9" fill="url(#appleCandy)" stroke="#ffd9a5" stroke-width="2"/>
+    <use xlink:href="#miniStar" transform="translate(1157 1000) scale(.78)" fill="url(#peachCandy)" stroke="#fff0cf" stroke-width="1.5"/>
+    <circle cx="1174" cy="1007" r="8" fill="#58a56c" stroke="#d9f2b0" stroke-width="2"/>
+    <path d="M1113 1047h79l-11 32h-57Z" fill="none" stroke="#354d5d" stroke-width="5"/>
+    <path d="M1120 1054l61 19M1144 1051l-5 27M1168 1052l-7 25" stroke="#647d84" stroke-width="3"/>
+  </g>
+  <path d="M1122 1047q34 14 68 0" fill="none" stroke="#273d50" stroke-width="5"/>
+
+  <!-- Candy-shaped sparks around the wing and a tiny altitude pennant -->
+  <g opacity=".92">
+    <circle cx="1223" cy="957" r="12" fill="url(#appleCandy)" stroke="#fff2d1" stroke-width="3"/>
+    <use xlink:href="#miniStar" transform="translate(1258 951) scale(.76)" fill="url(#peachCandy)" stroke="#fff2d1" stroke-width="2"/>
+    <path d="M1273 977q8-10 19-1-1 17-17 21-13-8-2-20Z" fill="#e14d43" stroke="#fff0c6" stroke-width="3"/>
+    <path d="M1281 976q-2-10 7-12" fill="none" stroke="#487d50" stroke-width="3"/>
+  </g>
+
+  <!-- Speech balloon: the full question, its table, both pairings and the answer -->
+  <path d="M112 55H1450Q1495 55 1495 100V580Q1495 625 1450 625H930Q900 625 884 652L840 735 788 652Q771 625 735 625H112Q65 625 65 580V100Q65 55 112 55Z" fill="url(#speech)" stroke="#29495c" stroke-width="7" stroke-linejoin="round" filter="url(#softShadow)"/>
+  <path d="M102 104Q102 83 126 83H1436Q1458 83 1458 107V574Q1458 597 1435 597H1152" fill="none" stroke="#d0e3dd" stroke-width="3" opacity=".9"/>
+  <path d="M878 622 840 735 914 622" fill="none" stroke="#cfddd8" stroke-width="3" opacity=".92"/>
+  <circle cx="105" cy="102" r="11" fill="#e75e48"/>
+  <circle cx="105" cy="102" r="4" fill="#fff7d8"/>
+  <text x="128" y="111" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="27" font-weight="900" letter-spacing="1" fill="#263f52">鹈鹕的空中广播</text>
+  <text x="412" y="109" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="15" font-weight="800" letter-spacing="2" fill="#6d8790">CANDY PUZZLE · 高空数学挑战</text>
+  <g transform="translate(909 93)">
+    <rect width="56" height="27" rx="13.5" fill="#e8f2ed" stroke="#bed2cf" stroke-width="1.5"/>
+    <circle cx="15" cy="13.5" r="6" fill="#74a78b"/>
+    <text x="36" y="19" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" font-weight="800" fill="#557374">LIVE</text>
+  </g>
+  <path d="M1010 127V590" stroke="#d8e5df" stroke-width="3" stroke-dasharray="5 8"/>
+  <g font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="20.5" font-weight="560" fill="#293f50">
+    <text x="108" y="159">
+      <tspan x="108" dy="0">在一个黑色的袋子里放有三种口味的糖果，每种糖果有两种不同的形状</tspan>
+      <tspan x="108" dy="31">（圆形和五角星形，不同的形状靠手感可以分辨）。现已知不同口味的糖</tspan>
+      <tspan x="108" dy="31">和不同形状的数量统计如下表。参赛者需要在活动前决定摸出的糖果数目，</tspan>
+      <tspan x="108" dy="31">那么，最少取出多少个糖果才能保证手中同时拥有不同形状的苹果味和桃子味的糖？</tspan>
+      <tspan x="108" dy="31">（同时手中有圆形苹果味匹配五角星桃子味糖果，或者有圆形桃子味匹配</tspan>
+      <tspan x="108" dy="31">五角星苹果味糖果都满足要求）</tspan>
+    </text>
+  </g>
+  <text x="110" y="383" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="17" font-weight="900" letter-spacing="1" fill="#55717d">满足条件的两种「交叉配对」</text>
+  <g>
+    <rect x="108" y="402" width="419" height="174" rx="19" fill="#eef5f2" stroke="#c8d9d5" stroke-width="2"/>
+    <rect x="541" y="402" width="441" height="174" rx="19" fill="#eef5f2" stroke="#c8d9d5" stroke-width="2"/>
+    <rect x="126" y="418" width="87" height="25" rx="12" fill="#d7e8e1"/>
+    <text x="169" y="436" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" font-weight="900" fill="#42656b">配对 A</text>
+    <rect x="559" y="418" width="87" height="25" rx="12" fill="#d7e8e1"/>
+    <text x="602" y="436" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13" font-weight="900" fill="#42656b">配对 B</text>
+    <circle cx="157" cy="493" r="23" fill="url(#appleCandy)" stroke="#8e4140" stroke-width="3"/>
+    <circle cx="149" cy="485" r="6" fill="#fff2d8" opacity=".75"/>
+    <path d="M156 468q3-12 15-12" fill="none" stroke="#5b9656" stroke-width="4" stroke-linecap="round"/>
+    <text x="190" y="499" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="17" font-weight="800" fill="#2c4555">苹果味圆形</text>
+    <text x="310" y="499" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="27" font-weight="700" fill="#7a9295">＋</text>
+    <use xlink:href="#starCandy" transform="translate(354 493) scale(.78)" fill="url(#peachCandy)" stroke="#a9544a" stroke-width="2.7"/>
+    <text x="385" y="499" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="800" fill="#2c4555">桃子味五角星</text>
+
+    <circle cx="590" cy="493" r="23" fill="url(#peachCandy)" stroke="#a9544a" stroke-width="3"/>
+    <circle cx="582" cy="485" r="6" fill="#fff5d9" opacity=".8"/>
+    <text x="623" y="499" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="17" font-weight="800" fill="#2c4555">桃子味圆形</text>
+    <text x="745" y="499" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="27" font-weight="700" fill="#7a9295">＋</text>
+    <use xlink:href="#starCandy" transform="translate(789 493) scale(.78)" fill="url(#appleCandy)" stroke="#8e4140" stroke-width="2.7"/>
+    <text x="820" y="499" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="800" fill="#2c4555">苹果味五角星</text>
+    <path d="M132 535h370M566 535h390" stroke="#d4e1dd" stroke-width="2"/>
+    <text x="317" y="560" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#71888e">不同口味 × 不同形状</text>
+    <text x="761" y="560" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#71888e">任意一组成立即可</text>
+  </g>
+
+  <!-- Candy-count table -->
+  <text x="1242" y="133" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="19" font-weight="900" letter-spacing="1" fill="#304a5b">糖果数量统计（颗）</text>
+  <g>
+    <rect x="1033" y="149" width="423" height="169" rx="13" fill="#fffefa" stroke="#617b86" stroke-width="3"/>
+    <path d="M1046 149h397a13 13 0 0 1 13 13v34h-423v-34a13 13 0 0 1 13-13Z" fill="#dcebe7"/>
+    <path d="M1148 149v169M1250 149v169M1352 149v169M1033 196h423M1033 257h423" stroke="#bacdca" stroke-width="2"/>
+    <text x="1090" y="180" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" font-weight="800" fill="#587078">形状 / 口味</text>
+    <text x="1199" y="180" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="900" fill="#a9443e">苹果味</text>
+    <text x="1301" y="180" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="900" fill="#c06f49">桃子味</text>
+    <text x="1403" y="180" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="16" font-weight="900" fill="#47806a">西瓜味</text>
+    <circle cx="1058" cy="225" r="10" fill="url(#appleCandy)" stroke="#974b43" stroke-width="2"/>
+    <text x="1077" y="231" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="15" font-weight="700" fill="#385161">圆形</text>
+    <text x="1199" y="235" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="900" fill="#31495b">7</text>
+    <text x="1301" y="235" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="900" fill="#31495b">9</text>
+    <text x="1403" y="235" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="900" fill="#31495b">8</text>
+    <use xlink:href="#miniStar" transform="translate(1058 285) scale(.8)" fill="#e2ae56" stroke="#986b35" stroke-width="1.5"/>
+    <text x="1077" y="291" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" font-weight="700" fill="#385161">五角星形</text>
+    <text x="1199" y="296" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="900" fill="#31495b">7</text>
+    <text x="1301" y="296" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="900" fill="#31495b">6</text>
+    <text x="1403" y="296" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="900" fill="#31495b">4</text>
+  </g>
+
+  <!-- Loud, unmissable answer badge -->
+  <g filter="url(#smallShadow)">
+    <rect x="1033" y="338" width="423" height="258" rx="24" fill="url(#answerGold)" stroke="#8d6338" stroke-width="4"/>
+    <path d="M1050 388q0-22 22-22h167q22 0 22 22t-22 22h-167q-22 0-22-22Z" fill="#335267"/>
+    <text x="1144" y="395" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="17" font-weight="900" letter-spacing="1" fill="#fff1c6">最少取出 · 保证值</text>
+    <path d="M1383 366l8 15 17 1-13 11 5 17-17-10-15 10 5-17-14-11 18-1Z" fill="#fff6d4" opacity=".92"/>
+    <text x="1081" y="500" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="105" font-weight="1000" letter-spacing="-8" fill="#b64d36" stroke="#fff4cf" stroke-width="2" paint-order="stroke">29</text>
+    <text x="1226" y="484" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="39" font-weight="900" fill="#304a5a">颗糖果</text>
+    <text x="1230" y="513" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14" font-weight="800" letter-spacing="1" fill="#88643a">GUARANTEED DRAW</text>
+    <path d="M1057 526h375" stroke="#d0ae67" stroke-width="2"/>
+    <text x="1057" y="550" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14.5" font-weight="750" fill="#4b4a42">最坏可先拿：7（圆苹果）＋9（圆桃）</text>
+    <text x="1057" y="570" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="14.5" font-weight="750" fill="#4b4a42">＋8（圆西瓜）＋4（星西瓜）＝28</text>
+    <text x="1057" y="585" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-size="13.5" font-weight="850" fill="#9a4b36">再取 1 颗，必有交叉配对！</text>
+  </g>
+
+  <!-- A tiny red pennant on the airframe, fluttering in the slipstream -->
+  <g transform="translate(1800 575) rotate(13)">
+    <path d="M0 0v71" stroke="#526b77" stroke-width="5"/>
+    <path d="M3 4q28 8 66-3l-14 26 14 22Q31 45 3 55Z" fill="#d94f3e" stroke="#77383a" stroke-width="3"/>
+    <path d="M12 16q19 5 39 0" fill="none" stroke="#ffd577" stroke-width="3"/>
+  </g>
+
+  <!-- Fine paper grain, kept extremely light so the vector stays crisp -->
+  <rect width="1920" height="1440" fill="url(#tinyDots)" opacity=".18" pointer-events="none"/>
+</svg>

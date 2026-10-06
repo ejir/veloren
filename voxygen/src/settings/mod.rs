@@ -1,3 +1,4 @@
+#[cfg(not(target_os = "android"))]
 use directories_next::UserDirs;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -55,22 +56,25 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        let user_dirs = UserDirs::new().expect("System's $HOME directory path not found!");
-
-        // Chooses a path to store the screenshots by the following order:
-        //  - The VOXYGEN_SCREENSHOT environment variable
-        //  - The user's picture directory
-        //  - The executable's directory
-        // This only selects if there isn't already an entry in the settings file
+        // Chooses a path to store screenshots. Android has no conventional Pictures
+        // directory for a native-only Activity, so keep them in the app-private data dir.
+        #[cfg(not(target_os = "android"))]
+        let screenshots_path = {
+            let user_dirs = UserDirs::new().expect("System's $HOME directory path not found!");
+            std::env::var_os("VOXYGEN_SCREENSHOT")
+                .map(PathBuf::from)
+                .or_else(|| user_dirs.picture_dir().map(|dir| dir.join("veloren")))
+                .or_else(|| {
+                    std::env::current_exe()
+                        .ok()
+                        .and_then(|dir| dir.parent().map(PathBuf::from))
+                })
+                .expect("Couldn't choose a place to store the screenshots")
+        };
+        #[cfg(target_os = "android")]
         let screenshots_path = std::env::var_os("VOXYGEN_SCREENSHOT")
             .map(PathBuf::from)
-            .or_else(|| user_dirs.picture_dir().map(|dir| dir.join("veloren")))
-            .or_else(|| {
-                std::env::current_exe()
-                    .ok()
-                    .and_then(|dir| dir.parent().map(PathBuf::from))
-            })
-            .expect("Couldn't choose a place to store the screenshots");
+            .unwrap_or_else(|| common_base::userdata_dir().join("screenshots"));
 
         Settings {
             chat: ChatSettings::default(),
@@ -80,6 +84,9 @@ impl Default for Settings {
             hud_position: HudPositionSettings::default(),
             gameplay: GameplaySettings::default(),
             networking: NetworkingSettings::default(),
+            #[cfg(target_os = "android")]
+            graphics: GraphicsSettings::default().into_low(),
+            #[cfg(not(target_os = "android"))]
             graphics: GraphicsSettings::default(),
             audio: AudioSettings::default(),
             show_disclaimer: true,

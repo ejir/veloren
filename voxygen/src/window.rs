@@ -16,6 +16,10 @@ use strum::{AsRefStr, EnumIter};
 use tracing::{error, warn};
 use vek::*;
 use winit::monitor::VideoModeHandle;
+#[cfg(target_os = "android")]
+use winit::platform::android::EventLoopBuilderExtAndroid;
+#[cfg(not(target_os = "android"))]
+use winit::window::CursorGrabMode;
 
 /// Represents a key that the game menus recognise after input mapping
 #[derive(
@@ -103,6 +107,12 @@ pub enum Event {
     Ui(ui::Event),
     /// Event that the iced ui uses.
     IcedUi(ui::ice::Event),
+    /// Raw touch input retained for platform-specific in-game controls.
+    Touch {
+        id: u64,
+        phase: winit::event::TouchPhase,
+        position: Vec2<f32>,
+    },
     /// The view distance has changed.
     ViewDistanceChanged(u32),
     /// Game settings have changed.
@@ -260,7 +270,15 @@ impl Window {
     pub fn new(
         settings: &Settings,
         runtime: &tokio::runtime::Runtime,
+        #[cfg(target_os = "android")] android_app: &winit::platform::android::activity::AndroidApp,
     ) -> Result<(Window, EventLoop), Error> {
+        #[cfg(target_os = "android")]
+        let event_loop = {
+            let mut builder = winit::event_loop::EventLoop::builder();
+            builder.with_android_app(android_app.clone());
+            builder.build().unwrap()
+        };
+        #[cfg(not(target_os = "android"))]
         let event_loop = EventLoop::new().unwrap();
 
         let window = settings.graphics.window;
@@ -274,7 +292,11 @@ impl Window {
             ))
             .with_maximized(window.maximised);
 
-        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        #[cfg(not(any(
+            target_os = "windows",
+            target_os = "macos",
+            target_os = "android"
+        )))]
         {
             use winit::platform::wayland::WindowAttributesExtWayland;
             attributes = attributes.with_name("net.veloren.veloren", "veloren");
@@ -879,6 +901,13 @@ impl Window {
                 self.focused = state;
                 self.events.push(Event::Focused(state));
             },
+            WindowEvent::Touch(touch) => {
+                self.events.push(Event::Touch {
+                    id: touch.id,
+                    phase: touch.phase,
+                    position: Vec2::new(touch.location.x as f32, touch.location.y as f32),
+                });
+            },
             WindowEvent::CursorMoved { position, .. } => {
                 if self.cursor_grabbed {
                     self.reset_cursor_position();
@@ -928,20 +957,24 @@ impl Window {
     pub fn is_cursor_grabbed(&self) -> bool { self.cursor_grabbed }
 
     pub fn grab_cursor(&mut self, grab: bool) {
-        use winit::window::CursorGrabMode;
-
         self.cursor_grabbed = grab;
-        self.window.set_cursor_visible(!grab);
-        let res = if grab {
-            self.window
-                .set_cursor_grab(CursorGrabMode::Locked)
-                .or_else(|_e| self.window.set_cursor_grab(CursorGrabMode::Confined))
-        } else {
-            self.window.set_cursor_grab(CursorGrabMode::None)
-        };
 
-        if let Err(e) = res {
-            error!(?e, ?grab, "Failed to toggle cursor grab");
+        // Android has no hardware cursor to confine or hide. Keep the logical
+        // grabbed state for game-input routing without calling unsupported APIs.
+        #[cfg(not(target_os = "android"))]
+        {
+            self.window.set_cursor_visible(!grab);
+            let res = if grab {
+                self.window
+                    .set_cursor_grab(CursorGrabMode::Locked)
+                    .or_else(|_e| self.window.set_cursor_grab(CursorGrabMode::Confined))
+            } else {
+                self.window.set_cursor_grab(CursorGrabMode::None)
+            };
+
+            if let Err(e) = res {
+                error!(?e, ?grab, "Failed to toggle cursor grab");
+            }
         }
     }
 
