@@ -1,5 +1,7 @@
 #![expect(non_local_definitions)] // because of WidgetCommon derive
 mod action_bar;
+#[cfg(target_os = "android")]
+pub(crate) mod touch_buttons;
 mod animation;
 mod bag;
 mod buffs;
@@ -1405,6 +1407,9 @@ pub struct Hud {
     extra_markers: Vec<map::ExtraMarker>,
     /// Inputs currently held down through the action bar.
     action_held: HashSet<GameInput>,
+    /// Touch buttons on screen this frame, used by the session to hit-test taps.
+    #[cfg(target_os = "android")]
+    touch_regions: Vec<touch_buttons::Region>,
     /// Whether the secondary action bar row is expanded.
     action_bar_expanded: bool,
 }
@@ -1516,6 +1521,8 @@ impl Hud {
             current_dialogue: None,
             extra_markers: Vec::new(),
             action_held: HashSet::new(),
+            #[cfg(target_os = "android")]
+            touch_regions: Vec::new(),
             action_bar_expanded: false,
         }
     }
@@ -1544,6 +1551,10 @@ impl Hud {
     }
 
     #[expect(clippy::single_match)] // TODO: Pending review in #587
+    /// Touch buttons on screen this frame, for hit-testing taps.
+    #[cfg(target_os = "android")]
+    pub fn touch_regions(&self) -> &[touch_buttons::Region] { &self.touch_regions }
+
     fn update_layout(
         &mut self,
         client: &Client,
@@ -1568,71 +1579,6 @@ impl Hud {
         // HUD renders and captures input above them. While the pointer is
         // grabbed, taps on widgets like the tutorial button must reach conrod
         // instead of being swallowed by the overlay backdrops.
-        #[cfg(target_os = "android")]
-        if self.show.ingame && self.show.want_grab {
-            // Movement/combat, five skill slots, menu actions and context actions.
-            // Each target has a translucent backdrop and label. Every entry must
-            // have the same position as the matching hit region in
-            // android_touch_button (session), which is what makes it work.
-            let (glide_label, lantern_label, wield_label, sneak_label) = {
-                let i18n = global_state.i18n.read();
-                (
-                    i18n.get_msg("hud-touch-glide").into_owned(),
-                    i18n.get_msg("hud-touch-lantern").into_owned(),
-                    i18n.get_msg("hud-touch-wield").into_owned(),
-                    i18n.get_msg("hud-touch-sneak").into_owned(),
-                )
-            };
-            let controls = [
-                (0.20, 0.76, 0.34, "MOVE"),
-                (0.90, 0.78, 0.15, "ATK"),
-                (0.76, 0.85, 0.15, "ALT"),
-                (0.76, 0.66, 0.15, "JUMP"),
-                (0.90, 0.57, 0.15, "USE"),
-                (0.76, 0.47, 0.15, "ROLL"),
-                (0.50, 0.26, 0.10, "1"),
-                (0.60, 0.26, 0.10, "2"),
-                (0.70, 0.26, 0.10, "3"),
-                (0.80, 0.26, 0.10, "4"),
-                (0.90, 0.26, 0.10, "5"),
-                (0.56, 0.075, 0.09, "BAG"),
-                (0.66, 0.075, 0.09, "SKILL"),
-                (0.76, 0.075, 0.09, "SET"),
-                (0.86, 0.075, 0.09, "MENU"),
-                (0.66, 0.66, 0.15, glide_label.as_str()),
-                (0.66, 0.85, 0.15, lantern_label.as_str()),
-                (0.66, 0.47, 0.15, wield_label.as_str()),
-                (0.90, 0.415, 0.15, sneak_label.as_str()),
-            ];
-            let touch_control_count = controls.len() * 2;
-            if self.ids.android_touch_controls.len() < touch_control_count {
-                self.ids
-                    .android_touch_controls
-                    .resize(touch_control_count, &mut ui_widgets.widget_id_generator());
-            }
-
-            // The touch hit regions live in physical screen coordinates; these
-            // fractional positions keep the visual controls aligned at any density.
-            let label_offset = controls.len();
-            for (index, (x, y, diameter, label)) in controls.into_iter().enumerate() {
-                let center = Vec2::new((x - 0.5) * ui_widgets.win_w, (0.5 - y) * ui_widgets.win_h);
-                let size = ui_widgets.win_h * diameter;
-                Rectangle::fill([size, size])
-                    .rgba(0.04, 0.07, 0.09, 0.38)
-                    .x_y(center.x, center.y)
-                    .set(self.ids.android_touch_controls[index], ui_widgets);
-                Text::new(label)
-                    .font_id(self.fonts.cyri.conrod_id)
-                    .font_size(self.fonts.cyri.scale(18))
-                    .color(Color::Rgba(1.0, 1.0, 1.0, 0.8))
-                    .x_y(center.x, center.y)
-                    .set(
-                        self.ids.android_touch_controls[index + label_offset],
-                        ui_widgets,
-                    );
-            }
-        }
-
         // self.ui.set_item_widgets(); pulse time for pulsating elements
         self.pulse += dt.as_secs_f32();
         // FPS
@@ -1671,6 +1617,72 @@ impl Hud {
             let terrain = ecs.read_resource::<common::terrain::TerrainGrid>();
             let colliders = ecs.read_storage::<comp::Collider>();
             let char_states = ecs.read_storage::<comp::CharacterState>();
+
+            // Virtual touch buttons (phones). Drawn before the other HUD widgets so
+            // the HUD renders and captures input above them. Context buttons follow
+            // the action bar rules, so they appear and disappear with the state.
+            #[cfg(target_os = "android")]
+            {
+                self.touch_regions.clear();
+                if self.show.want_grab {
+                    let char_state = char_states.get(me);
+                    let inventory = inventories.get(me);
+                    let ctx = action_bar::Context {
+                        controlling: char_state.is_some()
+                            && healths.get(me).is_some_and(|h| !h.is_dead),
+                        riding: client.is_riding(),
+                        wielding: client.is_wielding() == Some(true),
+                        gliding: client.is_gliding(),
+                        has_glider: inventory
+                            .is_some_and(|inv| inv.equipped(comp::slot::EquipSlot::Glider).is_some()),
+                        has_lantern: inventory
+                            .is_some_and(|inv| inv.equipped(comp::slot::EquipSlot::Lantern).is_some()),
+                        lantern_on: client.is_lantern_enabled(),
+                        sneaking: char_state.is_some_and(|cs| cs.is_stealthy()),
+                        sitting: char_state.is_some_and(|cs| matches!(cs, comp::CharacterState::Sit)),
+                        crawling: char_state.is_some_and(|cs| matches!(cs, comp::CharacterState::Crawl)),
+                        dancing: char_state.is_some_and(|cs| matches!(cs, comp::CharacterState::Dance)),
+                        zoom_locked: global_state.settings.gameplay.zoom_lock,
+                    };
+                    let shown = touch_buttons::shown(&ctx, |key| i18n.get_msg(key).into_owned());
+                    self.touch_regions = touch_buttons::regions(&shown);
+
+                    if self.ids.android_touch_controls.len() < touch_buttons::COUNT * 2 {
+                        self.ids.android_touch_controls.resize(
+                            touch_buttons::COUNT * 2,
+                            &mut ui_widgets.widget_id_generator(),
+                        );
+                    }
+                    // Label widgets follow the backdrop widgets.
+                    let label_offset = touch_buttons::COUNT;
+                    for button in &shown {
+                        let center = Vec2::new(
+                            (button.center.x as f64 - 0.5) * ui_widgets.win_w,
+                            (0.5 - button.center.y as f64) * ui_widgets.win_h,
+                        );
+                        let size = ui_widgets.win_h * button.diameter as f64;
+                        let backdrop = match (button.enabled, button.active) {
+                            (false, _) => (0.04, 0.07, 0.09, 0.15),
+                            (true, true) => (0.20, 0.45, 0.25, 0.55),
+                            (true, false) => (0.04, 0.07, 0.09, 0.38),
+                        };
+                        let text_alpha = if button.enabled { 0.8 } else { 0.3 };
+                        Rectangle::fill([size, size])
+                            .rgba(backdrop.0, backdrop.1, backdrop.2, backdrop.3)
+                            .x_y(center.x, center.y)
+                            .set(self.ids.android_touch_controls[button.index], ui_widgets);
+                        Text::new(&button.label)
+                            .font_id(self.fonts.cyri.conrod_id)
+                            .font_size(self.fonts.cyri.scale(18))
+                            .color(Color::Rgba(1.0, 1.0, 1.0, text_alpha))
+                            .x_y(center.x, center.y)
+                            .set(
+                                self.ids.android_touch_controls[button.index + label_offset],
+                                ui_widgets,
+                            );
+                    }
+                }
+            }
 
             // Check if there was a persistence load error of the skillset, and if so
             // display a dialog prompt

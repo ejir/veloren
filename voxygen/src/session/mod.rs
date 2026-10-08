@@ -98,111 +98,19 @@ enum AndroidTouchControl {
     Button(GameInput),
 }
 
+/// Returns the touch button under `position`. The buttons come from the HUD,
+/// which draws them, so a tap always matches what is on screen.
 #[cfg(target_os = "android")]
-fn android_touch_button(position: Vec2<f32>, width: f32, height: f32) -> Option<GameInput> {
-    // Landscape touch layout for combat, movement, and interaction targets.
-    // The left half remains available for the movement stick and camera swipes.
-    // Positions must match the touch overlay drawn by the HUD.
-    let combat_radius = height * 0.075;
-    let menu_radius = height * 0.05;
-    let skill_radius = height * 0.05;
-    [
-        (
-            GameInput::Primary,
-            Vec2::new(width * 0.90, height * 0.78),
-            combat_radius,
-        ),
-        (
-            GameInput::Secondary,
-            Vec2::new(width * 0.76, height * 0.85),
-            combat_radius,
-        ),
-        (
-            GameInput::Jump,
-            Vec2::new(width * 0.76, height * 0.66),
-            combat_radius,
-        ),
-        (
-            GameInput::Interact,
-            Vec2::new(width * 0.90, height * 0.57),
-            combat_radius,
-        ),
-        (
-            GameInput::Roll,
-            Vec2::new(width * 0.76, height * 0.47),
-            combat_radius,
-        ),
-        (
-            GameInput::Inventory,
-            Vec2::new(width * 0.56, height * 0.075),
-            menu_radius,
-        ),
-        (
-            GameInput::Diary,
-            Vec2::new(width * 0.66, height * 0.075),
-            menu_radius,
-        ),
-        (
-            GameInput::Settings,
-            Vec2::new(width * 0.76, height * 0.075),
-            menu_radius,
-        ),
-        (
-            GameInput::Escape,
-            Vec2::new(width * 0.86, height * 0.075),
-            menu_radius,
-        ),
-        (
-            GameInput::Slot1,
-            Vec2::new(width * 0.50, height * 0.26),
-            skill_radius,
-        ),
-        (
-            GameInput::Slot2,
-            Vec2::new(width * 0.60, height * 0.26),
-            skill_radius,
-        ),
-        (
-            GameInput::Slot3,
-            Vec2::new(width * 0.70, height * 0.26),
-            skill_radius,
-        ),
-        (
-            GameInput::Slot4,
-            Vec2::new(width * 0.80, height * 0.26),
-            skill_radius,
-        ),
-        (
-            GameInput::Slot5,
-            Vec2::new(width * 0.90, height * 0.26),
-            skill_radius,
-        ),
-        // Context actions that otherwise need a key: gliding, lantern, weapon
-        // sheathe/draw and sneaking. Keep in sync with the overlay in the HUD.
-        (
-            GameInput::Glide,
-            Vec2::new(width * 0.66, height * 0.66),
-            combat_radius,
-        ),
-        (
-            GameInput::ToggleLantern,
-            Vec2::new(width * 0.66, height * 0.85),
-            combat_radius,
-        ),
-        (
-            GameInput::ToggleWield,
-            Vec2::new(width * 0.66, height * 0.47),
-            combat_radius,
-        ),
-        (
-            GameInput::Sneak,
-            Vec2::new(width * 0.90, height * 0.415),
-            combat_radius,
-        ),
-    ]
-    .into_iter()
-    .find_map(|(button, center, radius)| {
-        ((position - center).magnitude_squared() <= radius * radius).then_some(button)
+fn android_touch_button(
+    regions: &[crate::hud::touch_buttons::Region],
+    position: Vec2<f32>,
+    width: f32,
+    height: f32,
+) -> Option<GameInput> {
+    regions.iter().find_map(|region| {
+        let center = Vec2::new(region.center.x * width, region.center.y * height);
+        let radius = region.radius * height;
+        ((position - center).magnitude_squared() <= radius * radius).then_some(region.input)
     })
 }
 
@@ -376,7 +284,9 @@ impl SessionState {
 
         match phase {
             TouchPhase::Started => {
-                let control = if let Some(button) = android_touch_button(position, width, height) {
+                let control = if let Some(button) =
+                    android_touch_button(self.hud.touch_regions(), position, width, height)
+                {
                     global_state
                         .window
                         .send_event(Event::InputUpdate(button, true));
