@@ -1,6 +1,6 @@
 use super::{
-    HudInfo, Show, TEXT_COLOR, TEXT_DULL_RED_COLOR, TEXT_GRAY_COLOR, UI_HIGHLIGHT_0, UI_MAIN,
-    get_quality_col,
+    CLOSE_BUTTON_SIZE, HudInfo, Show, TEXT_COLOR, TEXT_DULL_RED_COLOR, TEXT_GRAY_COLOR,
+    UI_HIGHLIGHT_0, UI_MAIN, get_quality_col,
     img_ids::{Imgs, ImgsRot},
     item_imgs::{ItemImgs, animate_by_pulse},
     slots::{CraftSlot, CraftSlotInfo, SlotManager},
@@ -432,7 +432,7 @@ impl Widget for Crafting<'_> {
 
         // Close Button
         if Button::image(self.imgs.close_btn)
-            .w_h(24.0, 25.0)
+            .w_h(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
             .hover_image(self.imgs.close_btn_hover)
             .press_image(self.imgs.close_btn_press)
             .top_right_with_margins_on(state.ids.window, 0.0, 0.0)

@@ -1,6 +1,7 @@
 use super::{
-    MapMarkers, QUALITY_COMMON, QUALITY_EPIC, QUALITY_HIGH, QUALITY_LOW, QUALITY_MODERATE, TEXT_BG,
-    TEXT_BLUE_COLOR, TEXT_COLOR, TEXT_GRAY_COLOR, TEXT_VELORITE, UI_HIGHLIGHT_0, UI_MAIN,
+    CLOSE_BUTTON_SIZE, MapMarkers, QUALITY_COMMON, QUALITY_EPIC, QUALITY_HIGH, QUALITY_LOW,
+    QUALITY_MODERATE, TEXT_BG, TEXT_BLUE_COLOR, TEXT_COLOR, TEXT_GRAY_COLOR, TEXT_VELORITE,
+    UI_HIGHLIGHT_0, UI_MAIN,
     img_ids::{Imgs, ImgsRot},
 };
 use crate::{
@@ -470,7 +471,7 @@ impl Widget for Map<'_> {
 
         // X-Button
         if Button::image(self.imgs.close_btn)
-            .w_h(24.0, 25.0)
+            .w_h(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
             .hover_image(self.imgs.close_btn_hover)
             .press_image(self.imgs.close_btn_press)
             .top_right_with_margins_on(state.ids.frame, 0.0, 0.0)

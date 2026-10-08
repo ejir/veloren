@@ -1,6 +1,6 @@
 use super::{
-    CRITICAL_HP_COLOR, HudInfo, LOW_HP_COLOR, Show, SlotGrid, TEXT_COLOR, UI_HIGHLIGHT_0, UI_MAIN,
-    cr_color,
+    CLOSE_BUTTON_SIZE, CRITICAL_HP_COLOR, HudInfo, LOW_HP_COLOR, Show, SlotGrid, TEXT_COLOR,
+    UI_HIGHLIGHT_0, UI_MAIN, cr_color,
     img_ids::{Imgs, ImgsRot},
     item_imgs::ItemImgs,
     slot_grid::SlotEvents,
@@ -305,9 +305,31 @@ impl<'a> InventoryScroller<'a> {
             .settings
             .interface
             .toggle_compact_item_slots;
-        let columns = if compact_mode { 9 } else { 6 };
-        let spacing = if compact_mode { 2.0 } else { 5.8 };
-        let slot_size = if compact_mode { 40.0 } else { 57.8 };
+        let touch_layout = cfg!(target_os = "android");
+        // Four larger slots per row make item selection and two-tap actions
+        // practical on a phone. The fixed inventory frame is wide enough for
+        // this layout without shrinking its scrollable area.
+        let columns = if touch_layout {
+            4
+        } else if compact_mode {
+            9
+        } else {
+            6
+        };
+        let spacing = if touch_layout {
+            6.0
+        } else if compact_mode {
+            2.0
+        } else {
+            5.8
+        };
+        let slot_size = if touch_layout {
+            80.0
+        } else if compact_mode {
+            40.0
+        } else {
+            57.8
+        };
 
         // Bag Slots
         for event in SlotGrid::new(
@@ -331,7 +353,11 @@ impl<'a> InventoryScroller<'a> {
         )
         .columns(columns)
         .spacing(if self.details_mode { 0.0 } else { spacing })
-        .slot_size(if self.details_mode { 20.0 } else { slot_size })
+        .slot_size(if self.details_mode && !touch_layout {
+            20.0
+        } else {
+            slot_size
+        })
         .w_of(state.ids.inv_alignment)
         .down_from(state.ids.spacing_above, 0.0)
         .set(state.ids.slot_grid, ui)
@@ -1129,7 +1155,7 @@ impl Widget for BagWindow<'_> {
         if is_primary {
             // Close button
             if Button::image(self.imgs.close_btn)
-                .w_h(24.0, 25.0)
+                .w_h(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
                 .hover_image(self.imgs.close_btn_hover)
                 .press_image(self.imgs.close_btn_press)
                 .top_right_of(self.bg_ids.bg_frame)
@@ -1531,10 +1557,36 @@ impl Widget for InventoryMenu<'_> {
             .settings
             .interface
             .toggle_compact_item_slots;
-        let columns = if compact_mode { 9 } else { 6 };
-        let spacing = if compact_mode { 2.0 } else { 5.8 };
-        let slot_size = if compact_mode { 40.0 } else { 57.8 };
-        let scroll_size = if compact_mode { 117 } else { 54 };
+        let touch_layout = cfg!(target_os = "android");
+        // Match the larger four-column touch layout used by the trade inventory.
+        let columns = if touch_layout {
+            4
+        } else if compact_mode {
+            9
+        } else {
+            6
+        };
+        let spacing = if touch_layout {
+            6.0
+        } else if compact_mode {
+            2.0
+        } else {
+            5.8
+        };
+        let slot_size = if touch_layout {
+            80.0
+        } else if compact_mode {
+            40.0
+        } else {
+            57.8
+        };
+        let scroll_size = if touch_layout {
+            24
+        } else if compact_mode {
+            117
+        } else {
+            54
+        };
 
         // Bag Slots
         for event in SlotGrid::new(
@@ -1558,7 +1610,11 @@ impl Widget for InventoryMenu<'_> {
         )
         .columns(columns)
         .spacing(if self.details_mode { 0.0 } else { spacing })
-        .slot_size(if self.details_mode { 20.0 } else { slot_size })
+        .slot_size(if self.details_mode && !touch_layout {
+            20.0
+        } else {
+            slot_size
+        })
         .filter(self.filter)
         .w_of(state.ids.inv_alignment)
         .down_from(state.ids.spacing_above, 0.0)

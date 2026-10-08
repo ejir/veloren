@@ -22,7 +22,7 @@ use crate::{
 use inline_tweak::*;
 
 use super::{
-    GameInput, Show, TEXT_COLOR, animate_by_pulse,
+    CLOSE_BUTTON_SIZE, GameInput, Show, TEXT_COLOR, animate_by_pulse,
     img_ids::{Imgs, ImgsRot},
     item_imgs::ItemImgs,
 };
@@ -211,7 +211,7 @@ impl Widget for Quest<'_> {
 
         // Close Button
         if Button::image(self._imgs.close_btn)
-            .w_h(24.0, 25.0)
+            .w_h(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
             .hover_image(self._imgs.close_btn_hover)
             .press_image(self._imgs.close_btn_press)
             .top_right_with_margins_on(state.ids.frame, 2.0, 4.0)

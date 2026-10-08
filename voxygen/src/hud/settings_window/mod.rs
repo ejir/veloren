@@ -10,7 +10,7 @@ mod video;
 
 use crate::{
     GlobalState,
-    hud::{Show, TEXT_COLOR, UI_HIGHLIGHT_0, UI_MAIN, img_ids::Imgs},
+    hud::{CLOSE_BUTTON_SIZE, Show, TEXT_COLOR, UI_HIGHLIGHT_0, UI_MAIN, img_ids::Imgs},
     session::settings_change::SettingsChange,
     ui::fonts::Fonts,
 };
@@ -210,7 +210,7 @@ impl Widget for SettingsWindow<'_> {
 
         // X-Button
         if Button::image(self.imgs.close_btn)
-            .w_h(24.0, 25.0)
+            .w_h(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
             .hover_image(self.imgs.close_btn_hover)
             .press_image(self.imgs.close_btn_press)
             .top_right_with_margins_on(state.ids.frame, 0.0, 0.0)
