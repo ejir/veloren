@@ -35,9 +35,21 @@ use specs::Entity as EcsEntity;
 use std::{borrow::Borrow, sync::Arc};
 use vek::Vec2;
 
-const CONTEXT_MENU_WIDTH: f64 = if cfg!(target_os = "android") { 180.0 } else { 130.0 };
-const CONTEXT_MENU_ITEM_HEIGHT: f64 = if cfg!(target_os = "android") { 48.0 } else { 25.0 };
-const CONTEXT_MENU_SPACING: f64 = if cfg!(target_os = "android") { 6.0 } else { 2.0 };
+const CONTEXT_MENU_WIDTH: f64 = if cfg!(target_os = "android") {
+    180.0
+} else {
+    130.0
+};
+const CONTEXT_MENU_ITEM_HEIGHT: f64 = if cfg!(target_os = "android") {
+    48.0
+} else {
+    25.0
+};
+const CONTEXT_MENU_SPACING: f64 = if cfg!(target_os = "android") {
+    6.0
+} else {
+    2.0
+};
 const CONTEXT_MENU_FONT_SIZE: u32 = if cfg!(target_os = "android") { 18 } else { 12 };
 
 #[derive(PartialEq)]

@@ -74,9 +74,7 @@ impl<I: Copy + PartialEq> TouchScrollTracker<I> {
     /// releasing over the original widget does not also activate it.
     pub fn finish(&mut self, id: I) -> bool {
         if self.active.as_ref().is_some_and(|touch| touch.id == id) {
-            self.active
-                .take()
-                .is_some_and(|touch| touch.moved)
+            self.active.take().is_some_and(|touch| touch.moved)
         } else {
             false
         }
@@ -114,7 +112,10 @@ mod tests {
         tracker.start(3, Vec2::new(0.0, 0.0));
 
         assert_eq!(
-            tracker.move_to(3, Vec2::new(TouchScrollTracker::<i32>::DRAG_THRESHOLD + 4.0, 1.0)),
+            tracker.move_to(
+                3,
+                Vec2::new(TouchScrollTracker::<i32>::DRAG_THRESHOLD + 4.0, 1.0)
+            ),
             None
         );
         assert!(tracker.finish(3));
@@ -126,7 +127,10 @@ mod tests {
         tracker.start(1, Vec2::new(0.0, 0.0));
 
         assert_eq!(
-            tracker.move_to(2, Vec2::new(0.0, TouchScrollTracker::<i32>::DRAG_THRESHOLD + 4.0)),
+            tracker.move_to(
+                2,
+                Vec2::new(0.0, TouchScrollTracker::<i32>::DRAG_THRESHOLD + 4.0)
+            ),
             None
         );
         assert!(!tracker.finish(2));

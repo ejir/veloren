@@ -348,10 +348,8 @@ impl Ui {
                         x: position.x,
                         y: position.y,
                     }));
-                    self.ui.handle_event(Input::Motion(Motion::Scroll {
-                        x: 0.0,
-                        y: delta.y,
-                    }));
+                    self.ui
+                        .handle_event(Input::Motion(Motion::Scroll { x: 0.0, y: delta.y }));
                 }
             },
             Input::Motion(motion) => self.ui.handle_event(Input::Motion(match motion {

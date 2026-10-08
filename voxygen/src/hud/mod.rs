@@ -162,7 +162,11 @@ const TEXT_BIND_CONFLICT_COLOR: Color = Color::Rgba(1.0, 0.0, 0.0, 1.0);
 const BLACK: Color = Color::Rgba(0.0, 0.0, 0.0, 1.0);
 
 /// A larger close target for windows when using a touchscreen.
-const CLOSE_BUTTON_SIZE: f64 = if cfg!(target_os = "android") { 72.0 } else { 24.0 };
+const CLOSE_BUTTON_SIZE: f64 = if cfg!(target_os = "android") {
+    72.0
+} else {
+    24.0
+};
 
 fn platform_hud_scale_mode(mode: ScaleMode) -> ScaleMode {
     // DpiFactor is appropriate for the responsive Iced menus, but this legacy
