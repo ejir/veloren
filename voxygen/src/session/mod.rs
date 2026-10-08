@@ -61,6 +61,8 @@ use target::targets_under_cursor;
 #[cfg(feature = "egui-ui")]
 use voxygen_egui::EguiDebugInfo;
 #[cfg(target_os = "android")]
+use crate::touch_controls::{self, TouchActionPage, TouchButtonAction};
+#[cfg(target_os = "android")]
 use winit::event::TouchPhase;
 
 /** The zoom scroll delta that is considered an "intent"
@@ -96,92 +98,7 @@ enum AndroidTouchControl {
     Move { origin: Vec2<f32> },
     Look { last: Vec2<f32> },
     Button(GameInput),
-}
-
-#[cfg(target_os = "android")]
-fn android_touch_button(position: Vec2<f32>, width: f32, height: f32) -> Option<GameInput> {
-    // Landscape touch layout for combat, movement, and interaction targets.
-    // The left half remains available for the movement stick and camera swipes.
-    // Positions must match the touch overlay drawn by the HUD.
-    let combat_radius = height * 0.075;
-    let menu_radius = height * 0.05;
-    let skill_radius = height * 0.05;
-    [
-        (
-            GameInput::Primary,
-            Vec2::new(width * 0.90, height * 0.78),
-            combat_radius,
-        ),
-        (
-            GameInput::Secondary,
-            Vec2::new(width * 0.76, height * 0.85),
-            combat_radius,
-        ),
-        (
-            GameInput::Jump,
-            Vec2::new(width * 0.76, height * 0.66),
-            combat_radius,
-        ),
-        (
-            GameInput::Interact,
-            Vec2::new(width * 0.90, height * 0.57),
-            combat_radius,
-        ),
-        (
-            GameInput::Roll,
-            Vec2::new(width * 0.76, height * 0.47),
-            combat_radius,
-        ),
-        (
-            GameInput::Inventory,
-            Vec2::new(width * 0.56, height * 0.075),
-            menu_radius,
-        ),
-        (
-            GameInput::Diary,
-            Vec2::new(width * 0.66, height * 0.075),
-            menu_radius,
-        ),
-        (
-            GameInput::Settings,
-            Vec2::new(width * 0.76, height * 0.075),
-            menu_radius,
-        ),
-        (
-            GameInput::Escape,
-            Vec2::new(width * 0.86, height * 0.075),
-            menu_radius,
-        ),
-        (
-            GameInput::Slot1,
-            Vec2::new(width * 0.50, height * 0.26),
-            skill_radius,
-        ),
-        (
-            GameInput::Slot2,
-            Vec2::new(width * 0.60, height * 0.26),
-            skill_radius,
-        ),
-        (
-            GameInput::Slot3,
-            Vec2::new(width * 0.70, height * 0.26),
-            skill_radius,
-        ),
-        (
-            GameInput::Slot4,
-            Vec2::new(width * 0.80, height * 0.26),
-            skill_radius,
-        ),
-        (
-            GameInput::Slot5,
-            Vec2::new(width * 0.90, height * 0.26),
-            skill_radius,
-        ),
-    ]
-    .into_iter()
-    .find_map(|(button, center, radius)| {
-        ((position - center).magnitude_squared() <= radius * radius).then_some(button)
-    })
+    PageSwitch,
 }
 
 #[derive(Default)]
@@ -202,6 +119,8 @@ pub struct SessionState {
     inputs_state: HashSet<GameInput>,
     #[cfg(target_os = "android")]
     android_touches: HashMap<u64, AndroidTouchControl>,
+    #[cfg(target_os = "android")]
+    android_touch_page: TouchActionPage,
     selected_block: Block,
     walk_forward_dir: Vec2<f32>,
     walk_right_dir: Vec2<f32>,
@@ -278,6 +197,8 @@ impl SessionState {
             inputs_state: HashSet::new(),
             #[cfg(target_os = "android")]
             android_touches: HashMap::new(),
+            #[cfg(target_os = "android")]
+            android_touch_page: TouchActionPage::Hotbar,
             hud,
             selected_block: Block::new(BlockKind::Misc, Rgb::broadcast(255)),
             walk_forward_dir,
@@ -324,7 +245,7 @@ impl SessionState {
                 AndroidTouchControl::Button(button) => global_state
                     .window
                     .send_event(Event::InputUpdate(button, false)),
-                AndroidTouchControl::Look { .. } => {},
+                AndroidTouchControl::Look { .. } | AndroidTouchControl::PageSwitch => {},
             }
         }
     }
@@ -354,12 +275,23 @@ impl SessionState {
 
         match phase {
             TouchPhase::Started => {
-                let control = if let Some(button) = android_touch_button(position, width, height) {
-                    global_state
-                        .window
-                        .send_event(Event::InputUpdate(button, true));
-                    AndroidTouchControl::Button(button)
-                } else if position.x < width * 0.42 && position.y > height * 0.32 {
+                let control = if let Some(action) =
+                    touch_controls::button_at(position, width, height, self.android_touch_page)
+                {
+                    match action {
+                        TouchButtonAction::Input(button) => {
+                            global_state
+                                .window
+                                .send_event(Event::InputUpdate(button, true));
+                            AndroidTouchControl::Button(button)
+                        },
+                        TouchButtonAction::NextPage => {
+                            self.android_touch_page = self.android_touch_page.next();
+                            self.hud.set_touch_action_page(self.android_touch_page);
+                            AndroidTouchControl::PageSwitch
+                        },
+                    }
+                } else if touch_controls::is_movement_stick_zone(position, width, height) {
                     global_state
                         .window
                         .send_event(Event::AnalogGameInput(AnalogGameInput::MovementX(0.0)));
@@ -405,7 +337,7 @@ impl SessionState {
                                 delta.y * sensitivity * invert_y,
                             )));
                         },
-                        AndroidTouchControl::Button(_) => {},
+                        AndroidTouchControl::Button(_) | AndroidTouchControl::PageSwitch => {},
                     }
                 }
             },
@@ -423,7 +355,7 @@ impl SessionState {
                         AndroidTouchControl::Button(button) => global_state
                             .window
                             .send_event(Event::InputUpdate(button, false)),
-                        AndroidTouchControl::Look { .. } => {},
+                        AndroidTouchControl::Look { .. } | AndroidTouchControl::PageSwitch => {},
                     }
                 }
             },
@@ -1971,6 +1903,8 @@ impl PlayState for SessionState {
                     selected_entity: self.selected_entity,
                     persistence_load_error: self.metadata.skill_set_persistence_load_error,
                     key_state: &self.key_state,
+                    #[cfg(target_os = "android")]
+                    pressed_inputs: &self.inputs_state,
                 },
                 inverted_interactable_map,
             );

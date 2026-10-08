@@ -32,6 +32,8 @@ pub mod run;
 pub mod scene;
 pub mod session;
 pub mod settings;
+#[cfg(any(target_os = "android", test))]
+mod touch_controls;
 #[cfg(feature = "singleplayer")]
 pub mod singleplayer;
 pub mod window;

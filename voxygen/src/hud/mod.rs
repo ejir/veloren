@@ -65,6 +65,8 @@ use subtitles::Subtitles;
 use trade::Trade;
 use tutorial::{DynamicTutorial, Tutorial};
 
+#[cfg(target_os = "android")]
+use crate::touch_controls::{self, TouchActionPage, TouchButtonAction, TouchButtonLabel};
 use crate::{
     GlobalState,
     audio::ActiveChannels,
@@ -695,6 +697,8 @@ pub struct HudInfo<'a> {
     pub selected_entity: Option<(specs::Entity, Instant)>,
     pub persistence_load_error: Option<SkillsPersistenceError>,
     pub key_state: &'a KeyState,
+    #[cfg(target_os = "android")]
+    pub pressed_inputs: &'a HashSet<GameInput>,
 }
 
 #[derive(Clone)]
@@ -1381,6 +1385,8 @@ pub struct Hud {
     hp_pulse: f32,
     slot_manager: slots::SlotManager,
     hotbar: hotbar::State,
+    #[cfg(target_os = "android")]
+    touch_action_page: TouchActionPage,
     events: Vec<Event>,
     menu_events: Vec<MenuInput>,
     crosshair_opacity: f32,
@@ -1485,6 +1491,8 @@ impl Hud {
             hp_pulse: 0.0,
             slot_manager,
             hotbar: hotbar_state,
+            #[cfg(target_os = "android")]
+            touch_action_page: TouchActionPage::Hotbar,
             events: Vec::new(),
             menu_events: Vec::new(),
             crosshair_opacity: 0.0,
@@ -1521,6 +1529,11 @@ impl Hud {
             .set_prefix_switch_point(prefix_switch_point);
     }
 
+    #[cfg(target_os = "android")]
+    pub(crate) fn set_touch_action_page(&mut self, page: TouchActionPage) {
+        self.touch_action_page = page;
+    }
+
     pub fn current_dialogue(&self) -> Option<EcsEntity> {
         self.current_dialogue.as_ref().map(|(e, _, _)| *e)
     }
@@ -1552,46 +1565,104 @@ impl Hud {
         // instead of being swallowed by the overlay backdrops.
         #[cfg(target_os = "android")]
         if self.show.ingame && self.show.want_grab {
-            // Movement/combat, five skill slots and menu actions. Each target has
-            // a translucent backdrop and label; the first half of this array is
-            // kept in sync with android_touch_button in session.
-            let controls = [
-                (0.20, 0.76, 0.34, "MOVE"),
-                (0.90, 0.78, 0.15, "ATK"),
-                (0.76, 0.85, 0.15, "ALT"),
-                (0.76, 0.66, 0.15, "JUMP"),
-                (0.90, 0.57, 0.15, "USE"),
-                (0.76, 0.47, 0.15, "ROLL"),
-                (0.50, 0.26, 0.10, "1"),
-                (0.60, 0.26, 0.10, "2"),
-                (0.70, 0.26, 0.10, "3"),
-                (0.80, 0.26, 0.10, "4"),
-                (0.90, 0.26, 0.10, "5"),
-                (0.56, 0.075, 0.09, "BAG"),
-                (0.66, 0.075, 0.09, "SKILL"),
-                (0.76, 0.075, 0.09, "SET"),
-                (0.86, 0.075, 0.09, "MENU"),
-            ];
-            let touch_control_count = controls.len() * 2;
+            let buttons = touch_controls::visible_buttons(self.touch_action_page);
+            let button_count = touch_controls::BUTTON_COUNT;
+            // Include the movement stick, then allocate one background and one
+            // label widget for each visible target. The five-button action strip
+            // is reused across pages, so adding actions does not crowd the HUD.
+            let touch_control_count = (button_count + 1) * 2;
             if self.ids.android_touch_controls.len() < touch_control_count {
                 self.ids
                     .android_touch_controls
                     .resize(touch_control_count, &mut ui_widgets.widget_id_generator());
             }
 
-            // The touch hit regions live in physical screen coordinates; these
-            // fractional positions keep the visual controls aligned at any density.
-            let label_offset = controls.len();
-            for (index, (x, y, diameter, label)) in controls.into_iter().enumerate() {
-                let center = Vec2::new((x - 0.5) * ui_widgets.win_w, (0.5 - y) * ui_widgets.win_h);
-                let size = ui_widgets.win_h * diameter;
+            // The touch hit regions use physical-screen fractions. Conrod's
+            // scaled window has the same proportions, keeping visuals and hit
+            // targets aligned at every device density.
+            let label_offset = button_count + 1;
+            let i18n = global_state.i18n.read();
+            let stick_label = i18n.get_msg(GameInput::MoveForward.get_localization_key());
+            let stick_center = Vec2::new(
+                (f64::from(touch_controls::MOVE_STICK_X) - 0.5) * ui_widgets.win_w,
+                (0.5 - f64::from(touch_controls::MOVE_STICK_Y)) * ui_widgets.win_h,
+            );
+            let stick_size = ui_widgets.win_h * f64::from(touch_controls::MOVE_STICK_DIAMETER);
+            Rectangle::fill([stick_size, stick_size])
+                .rgba(0.04, 0.07, 0.09, 0.38)
+                .x_y(stick_center.x, stick_center.y)
+                .set(self.ids.android_touch_controls[0], ui_widgets);
+            Text::new(stick_label.as_ref())
+                .font_id(self.fonts.cyri.conrod_id)
+                .font_size(self.fonts.cyri.scale(14))
+                .color(Color::Rgba(1.0, 1.0, 1.0, 0.8))
+                .x_y(stick_center.x, stick_center.y)
+                .set(self.ids.android_touch_controls[label_offset], ui_widgets);
+
+            for (button_index, button) in buttons.enumerate() {
+                let index = button_index + 1;
+                let center = Vec2::new(
+                    (f64::from(button.x) - 0.5) * ui_widgets.win_w,
+                    (0.5 - f64::from(button.y)) * ui_widgets.win_h,
+                );
+                let size = ui_widgets.win_h * f64::from(button.diameter);
+                let is_page_button = matches!(button.action, TouchButtonAction::NextPage);
+                let is_pressed = matches!(
+                    button.action,
+                    TouchButtonAction::Input(input) if info.pressed_inputs.contains(&input)
+                );
+                let is_active = match button.action {
+                    TouchButtonAction::Input(GameInput::Glide) => client.is_gliding(),
+                    TouchButtonAction::Input(GameInput::ToggleWield) => {
+                        client.is_wielding() == Some(true)
+                    },
+                    TouchButtonAction::Input(GameInput::ToggleLantern) => {
+                        client.is_lantern_enabled()
+                    },
+                    TouchButtonAction::Input(GameInput::ZoomLock) => {
+                        global_state.settings.gameplay.zoom_lock
+                    },
+                    TouchButtonAction::Input(GameInput::AutoWalk) => info.key_state.auto_walk,
+                    _ => false,
+                };
+                let (red, green, blue, alpha) = if is_page_button {
+                    (0.08, 0.20, 0.28, 0.72)
+                } else if is_pressed {
+                    (0.04, 0.40, 0.55, 0.76)
+                } else if is_active {
+                    (0.04, 0.42, 0.24, 0.68)
+                } else {
+                    (0.04, 0.07, 0.09, 0.38)
+                };
                 Rectangle::fill([size, size])
-                    .rgba(0.04, 0.07, 0.09, 0.38)
+                    .rgba(red, green, blue, alpha)
                     .x_y(center.x, center.y)
                     .set(self.ids.android_touch_controls[index], ui_widgets);
-                Text::new(label)
+
+                let label = match button.label {
+                    TouchButtonLabel::Static(label) => Cow::Borrowed(label),
+                    TouchButtonLabel::LocalizedInput => match button.action {
+                        TouchButtonAction::Input(input) => {
+                            i18n.get_msg(input.get_localization_key())
+                        },
+                        TouchButtonAction::NextPage => Cow::Borrowed(""),
+                    },
+                    // An arrow and page count are language-neutral, so
+                    // the page switch never falls back to a hard-coded word.
+                    TouchButtonLabel::PageIndicator => Cow::Owned(format!(
+                        "> {}/{}",
+                        self.touch_action_page.number(),
+                        TouchActionPage::PAGE_COUNT,
+                    )),
+                };
+                let font_size = match label.chars().count() {
+                    0..=4 => 18,
+                    5..=8 => 13,
+                    _ => 10,
+                };
+                Text::new(label.as_ref())
                     .font_id(self.fonts.cyri.conrod_id)
-                    .font_size(self.fonts.cyri.scale(18))
+                    .font_size(self.fonts.cyri.scale(font_size))
                     .color(Color::Rgba(1.0, 1.0, 1.0, 0.8))
                     .x_y(center.x, center.y)
                     .set(
