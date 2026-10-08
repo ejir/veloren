@@ -70,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Touch screens can now swipe the main menu lists (such as the language selection), and lifting the finger at the end of a swipe no longer selects the button underneath.
 - Traders sell items they are supposed to sell, no herbalists selling swords
 - Chat command autocomplete now works correctly again.
 - Resources in spots are now tracked by rtsim.
