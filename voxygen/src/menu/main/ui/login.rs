@@ -6,8 +6,8 @@ use crate::ui::{
         component::neat_button,
         style,
         widget::{
-            AspectRatioContainer, BackgroundContainer, Image, Padding,
-            compound_graphic::{CompoundGraphic, Graphic},
+            AspectRatioContainer, BackgroundContainer, Image, Padding, TouchScrollState,
+            TouchScrollable, compound_graphic::{CompoundGraphic, Graphic},
         },
     },
 };
@@ -217,6 +217,7 @@ pub struct LanguageSelectBanner {
     language_buttons: Vec<button::State>,
 
     selection_list: scrollable::State,
+    selection_touch_scroll: TouchScrollState,
 }
 
 impl LanguageSelectBanner {
@@ -284,6 +285,7 @@ impl LanguageSelectBanner {
         for item in list_items {
             list = list.push(item);
         }
+        let list = TouchScrollable::new(&mut self.selection_touch_scroll, list);
 
         let okay_button = Container::new(neat_button(
             &mut self.okay_button,

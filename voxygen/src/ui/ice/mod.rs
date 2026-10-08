@@ -27,10 +27,15 @@ use vek::*;
 
 pub type Element<'a, M> = iced::Element<'a, M, IcedRenderer>;
 
+struct QueuedEvent {
+    event: Event,
+    cursor_position: iced::Point,
+}
+
 pub struct IcedUi {
     renderer: IcedRenderer,
     cache: Option<Cache>,
-    events: Vec<Event>,
+    events: Vec<QueuedEvent>,
     cursor_position: Vec2<f32>,
     // Scaling of the ui
     scale: Scale,
@@ -84,6 +89,16 @@ impl IcedUi {
             scale,
             scale_changed: false,
         })
+    }
+
+    fn queue_event(&mut self, event: Event) {
+        self.events.push(QueuedEvent {
+            event,
+            cursor_position: iced::Point {
+                x: self.cursor_position.x,
+                y: self.cursor_position.y,
+            },
+        });
     }
 
     /// Add a new font that is referncable via the returned Id
@@ -140,7 +155,7 @@ impl IcedUi {
                 // may need to handle this in a different way to address
                 // whatever issue iced was trying to address
                 self.cursor_position = Vec2::new(x, y);
-                self.events.push(Event::Mouse(mouse::Event::CursorMoved {
+                self.queue_event(Event::Mouse(mouse::Event::CursorMoved {
                     position: iced::Point::new(x, y),
                 }));
             },
@@ -150,7 +165,7 @@ impl IcedUi {
             }) => {
                 // TODO: return f32 here
                 let scale = self.scale.scale_factor_logical() as f32;
-                self.events.push(Event::Mouse(mouse::Event::WheelScrolled {
+                self.queue_event(Event::Mouse(mouse::Event::WheelScrolled {
                     delta: mouse::ScrollDelta::Pixels {
                         x: x / scale,
                         y: y / scale,
@@ -180,14 +195,15 @@ impl IcedUi {
                         self.cursor_position = Vec2::new(position.x, position.y);
                         touch::Event::FingerLifted { id, position }
                     },
-                    touch::Event::FingerLost { id, position } => touch::Event::FingerLost {
-                        id,
-                        position: scaled(position),
+                    touch::Event::FingerLost { id, position } => {
+                        let position = scaled(position);
+                        self.cursor_position = Vec2::new(position.x, position.y);
+                        touch::Event::FingerLost { id, position }
                     },
                 };
-                self.events.push(Event::Touch(event));
+                self.queue_event(Event::Touch(event));
             },
-            event => self.events.push(event),
+            event => self.queue_event(event),
         }
     }
 
@@ -212,11 +228,10 @@ impl IcedUi {
             self.scale_changed = false;
 
             let scaled_resolution = self.scale.scaled_resolution().map(|e| e as f32);
-            self.events
-                .push(Event::Window(iced::window::Event::Resized {
-                    width: scaled_resolution.x as u32,
-                    height: scaled_resolution.y as u32,
-                }));
+            self.queue_event(Event::Window(iced::window::Event::Resized {
+                width: scaled_resolution.x as u32,
+                height: scaled_resolution.y as u32,
+            }));
             // Avoid panic in graphic cache when minimizing.
             // Somewhat inefficient for elements that won't change size after a window
             // resize
@@ -251,20 +266,24 @@ impl IcedUi {
         );
         drop(guard);
 
+        let queued_events = std::mem::take(&mut self.events);
         let messages = {
             span!(_guard, "update user_interface");
             let mut messages = Vec::new();
-            let _event_status_list = user_interface.update(
-                &self.events,
-                cursor_position,
-                &self.renderer,
-                clipboard,
-                &mut messages,
-            );
+            // Iced accepts a single cursor position per update call. Preserve the
+            // pointer position from each event so batched touch moves don't all
+            // appear at the final finger position (which breaks scrolling).
+            for queued_event in queued_events {
+                let _event_status = user_interface.update(
+                    std::slice::from_ref(&queued_event.event),
+                    queued_event.cursor_position,
+                    &self.renderer,
+                    clipboard,
+                    &mut messages,
+                );
+            }
             messages
         };
-        // Clear events
-        self.events.clear();
 
         span!(guard, "draw user_interface");
         let (primitive, mouse_interaction) =

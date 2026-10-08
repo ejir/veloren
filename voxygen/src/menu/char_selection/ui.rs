@@ -14,7 +14,7 @@ use crate::{
             style,
             widget::{
                 AspectRatioContainer, BackgroundContainer, Image, MouseDetector, Overlay, Padding,
-                TooltipManager, mouse_detector,
+                TouchScrollState, TouchScrollable, TooltipManager, mouse_detector,
             },
         },
         img_ids::ImageGraphic,
@@ -169,6 +169,7 @@ enum Mode {
         info_content: Option<InfoContent>,
 
         characters_scroll: scrollable::State,
+        characters_touch_scroll: TouchScrollState,
         character_buttons: Vec<button::State>,
         new_character_button: button::State,
         logout_button: button::State,
@@ -212,6 +213,7 @@ impl Mode {
         Self::Select {
             info_content,
             characters_scroll: Default::default(),
+            characters_touch_scroll: Default::default(),
             character_buttons: Vec::new(),
             new_character_button: Default::default(),
             logout_button: Default::default(),
@@ -477,6 +479,7 @@ impl Controls {
             Mode::Select {
                 info_content,
                 characters_scroll,
+                characters_touch_scroll,
                 character_buttons,
                 new_character_button,
                 logout_button,
@@ -563,15 +566,15 @@ impl Controls {
                 .center_y()
                 .width(Length::Fill);
 
+                let num = client.character_list().characters.len();
                 let characters = {
                     let characters = &client.character_list().characters;
-                    let num = characters.len();
                     // Ensure we have enough button states
                     const CHAR_BUTTONS: usize = 3;
                     character_buttons.resize_with(num * CHAR_BUTTONS, Default::default);
 
                     // Character Selection List
-                    let mut characters = characters
+                    let characters = characters
                         .iter()
                         .zip(character_buttons.chunks_exact_mut(CHAR_BUTTONS))
                         .filter_map(|(character, buttons)| {
@@ -704,72 +707,75 @@ impl Controls {
                             },
                         )
                         .collect::<Vec<_>>();
-
-                    // Add create new character button
-                    let color = if num >= MAX_CHARACTERS_PER_PLAYER {
-                        (97, 97, 25)
-                    } else {
-                        (97, 255, 18)
-                    };
-                    characters.push(
-                        AspectRatioContainer::new({
-                            let button = Button::new(
-                                new_character_button,
-                                Container::new(Text::new(
-                                    i18n.get_msg("char_selection-create_new_character"),
-                                ))
-                                .width(Length::Fill)
-                                .height(Length::Fill)
-                                .center_x()
-                                .center_y(),
-                            )
-                            .style(
-                                style::button::Style::new(imgs.char_selection)
-                                    .hover_image(imgs.char_selection_hover)
-                                    .press_image(imgs.char_selection_press)
-                                    .image_color(Rgba::new(color.0, color.1, color.2, 255))
-                                    .text_color(iced::Color::from_rgb8(color.0, color.1, color.2))
-                                    .disabled_text_color(iced::Color::from_rgb8(
-                                        color.0, color.1, color.2,
-                                    )),
-                            )
-                            .width(Length::Fill)
-                            .height(Length::Fill);
-                            if num < MAX_CHARACTERS_PER_PLAYER {
-                                button.on_press(Message::NewCharacter)
-                            } else {
-                                button
-                            }
-                        })
-                        .ratio_of_image(imgs.char_selection)
-                        .into(),
-                    );
-                    characters
                 };
 
-                // TODO: could replace column with scrollable completely if it had a with
-                // children method
-                let characters = Column::with_children(vec![
-                    Container::new(
-                        Scrollable::new(characters_scroll)
-                            .push(Column::with_children(characters).spacing(4))
-                            .padding(6)
-                            .scrollbar_width(5)
-                            .scroller_width(5)
-                            .width(Length::Fill)
-                            .style(style::scrollable::Style {
-                                track: None,
-                                scroller: style::scrollable::Scroller::Color(UI_MAIN),
-                            }),
+                // Keep the create button outside the character list so it stays
+                // visible even when the list is longer than the phone screen.
+                let color = if num >= MAX_CHARACTERS_PER_PLAYER {
+                    (97, 97, 25)
+                } else {
+                    (97, 255, 18)
+                };
+                let new_character_card = AspectRatioContainer::new({
+                    let button = Button::new(
+                        new_character_button,
+                        Container::new(Text::new(
+                            i18n.get_msg("char_selection-create_new_character"),
+                        ))
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .center_x()
+                        .center_y(),
                     )
-                    .style(style::container::Style::color(Rgba::from_translucent(
-                        0,
-                        BANNER_ALPHA,
-                    )))
-                    .width(Length::Units(322))
-                    .height(Length::Fill)
-                    .center_x()
-                    .into(),
+                    .style(
+                        style::button::Style::new(imgs.char_selection)
+                            .hover_image(imgs.char_selection_hover)
+                            .press_image(imgs.char_selection_press)
+                            .image_color(Rgba::new(color.0, color.1, color.2, 255))
+                            .text_color(iced::Color::from_rgb8(color.0, color.1, color.2))
+                            .disabled_text_color(iced::Color::from_rgb8(
+                                color.0, color.1, color.2,
+                            )),
+                    )
+                    .width(Length::Fill)
+                    .height(Length::Fill);
+                    if num < MAX_CHARACTERS_PER_PLAYER {
+                        button.on_press(Message::NewCharacter)
+                    } else {
+                        button
+                    }
+                })
+                .ratio_of_image(imgs.char_selection);
+
+                let character_list = TouchScrollable::new(
+                    characters_touch_scroll,
+                    Scrollable::new(characters_scroll)
+                        .push(Column::with_children(characters).spacing(4))
+                        .padding(6)
+                        .scrollbar_width(5)
+                        .scroller_width(5)
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .style(style::scrollable::Style {
+                            track: None,
+                            scroller: style::scrollable::Scroller::Color(UI_MAIN),
+                        }),
+                );
+
+                let characters = Column::with_children(vec![
+                    Container::new(character_list)
+                        .style(style::container::Style::color(Rgba::from_translucent(
+                            0,
+                            BANNER_ALPHA,
+                        )))
+                        .width(Length::Units(322))
+                        .height(Length::Fill)
+                        .center_x()
+                        .into(),
+                    Container::new(new_character_card)
+                        .width(Length::Units(322))
+                        .center_x()
+                        .into(),
                     Image::new(imgs.frame_bottom)
                         .height(Length::Units(40))
                         .width(Length::Units(322))
