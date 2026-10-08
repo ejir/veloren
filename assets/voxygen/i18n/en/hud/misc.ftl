@@ -10,6 +10,11 @@ hud-owned_by_for_secs = Owned by { $name } for { $secs } secs
 hud-press_key_to_show_debug_info_fmt = Press { $key } to show debug info
 hud-press_key_to_toggle_keybindings_fmt = Press { $key } to toggle key bindings
 hud-press_key_to_toggle_debug_info_fmt = Press { $key } to toggle debug info
+# On-screen action bar
+hud-action-sheathe = Sheathe
+hud-action-draw = Draw
+hud-action-more = More
+hud-action-less = Less
 hud-items_lost_dur = Your equipped items have lost Durability.
 hud-items_will_lose_dur = Your equipped items will lose Durability.
 hud-hardcore_char_deleted = This hardcore character has been deleted.

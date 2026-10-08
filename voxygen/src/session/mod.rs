@@ -2280,6 +2280,13 @@ impl PlayState for SessionState {
                     HudEvent::TradeAction(action) => {
                         self.client.borrow_mut().perform_trade_action(action);
                     },
+                    HudEvent::ActionInput { input, state } => {
+                        // Replay the action bar press as the matching key press, so it
+                        // goes through the same handling as the keyboard.
+                        global_state
+                            .window
+                            .send_event(Event::InputUpdate(input, state));
+                    },
                     HudEvent::Ability { idx, state } => {
                         self.client.borrow_mut().handle_input(
                             InputKind::Ability(idx),

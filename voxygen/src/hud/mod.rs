@@ -1,4 +1,5 @@
 #![expect(non_local_definitions)] // because of WidgetCommon derive
+mod action_bar;
 mod animation;
 mod bag;
 mod buffs;
@@ -369,6 +370,11 @@ widget_ids! {
         // Android touch controls (the widgets are only allocated on Android)
         android_touch_controls[],
 
+        // Context-sensitive action bar: one reusable button pool shared by
+        // every action, and one background per row
+        action_bar_backgrounds[],
+        action_buttons[],
+
         // Tutorial
         quest_bg,
         q_headline_bg,
@@ -722,6 +728,12 @@ pub enum Event {
     SplitDropSlot(comp::slot::Slot),
     SortInventory(InventorySortOrder),
     ChangeHotbarState(Box<HotbarState>),
+    /// A game input pressed (`state: true`) or released (`state: false`) on the
+    /// on-screen action bar. Forwarded as if the matching key had been used.
+    ActionInput {
+        input: GameInput,
+        state: bool,
+    },
     TradeAction(TradeAction),
     Ability {
         idx: usize,
@@ -1391,6 +1403,10 @@ pub struct Hud {
     clear_chat: bool,
     current_dialogue: Option<(EcsEntity, Instant, rtsim::Dialogue<true>)>,
     extra_markers: Vec<map::ExtraMarker>,
+    /// Inputs currently held down through the action bar.
+    action_held: HashSet<GameInput>,
+    /// Whether the secondary action bar row is expanded.
+    action_bar_expanded: bool,
 }
 
 impl Hud {
@@ -1499,6 +1515,8 @@ impl Hud {
             clear_chat: false,
             current_dialogue: None,
             extra_markers: Vec::new(),
+            action_held: HashSet::new(),
+            action_bar_expanded: false,
         }
     }
 
@@ -3377,6 +3395,110 @@ impl Hud {
                 }
             }
         }
+
+        // Action bar: on-screen buttons for actions that are otherwise only
+        // available through key bindings. Only actions that make sense for the
+        // current state are offered, and the rest sit behind "More".
+        let mut action_pressed = HashSet::new();
+        if self.show.ingame {
+            let char_state = char_states.get(entity);
+            let inventory = inventories.get(entity);
+            let ctx = action_bar::Context {
+                controlling: char_state.is_some() && healths.get(entity).is_some_and(|h| !h.is_dead),
+                riding: client.is_riding(),
+                wielding: client.is_wielding() == Some(true),
+                gliding: client.is_gliding(),
+                has_glider: inventory
+                    .is_some_and(|inv| inv.equipped(comp::slot::EquipSlot::Glider).is_some()),
+                has_lantern: inventory
+                    .is_some_and(|inv| inv.equipped(comp::slot::EquipSlot::Lantern).is_some()),
+                lantern_on: client.is_lantern_enabled(),
+                sneaking: char_state.is_some_and(|cs| cs.is_stealthy()),
+                sitting: char_state.is_some_and(|cs| matches!(cs, comp::CharacterState::Sit)),
+                crawling: char_state.is_some_and(|cs| matches!(cs, comp::CharacterState::Crawl)),
+                dancing: char_state.is_some_and(|cs| matches!(cs, comp::CharacterState::Dance)),
+                zoom_locked: global_state.settings.gameplay.zoom_lock,
+            };
+            let (primary, secondary) = action_bar::layout(&ctx, self.action_bar_expanded);
+
+            let localize = |key: &str| i18n.get_msg(key).into_owned();
+            let key_hint = |input: GameInput| {
+                global_state
+                    .settings
+                    .controls
+                    .get_binding(input)
+                    .map(|key| key.display_string())
+            };
+            let primary_items = action_bar::items(&primary, &localize, &key_hint);
+            let secondary_items = action_bar::items(&secondary, &localize, &key_hint);
+
+            // Grow the shared button pool once. Each row uses its own range of ids.
+            if self.ids.action_buttons.len() < action_bar::ROWS * action_bar::MAX_ROW_LEN {
+                self.ids.action_buttons.resize(
+                    action_bar::ROWS * action_bar::MAX_ROW_LEN,
+                    &mut ui_widgets.widget_id_generator(),
+                );
+            }
+            if self.ids.action_bar_backgrounds.len() < action_bar::ROWS {
+                self.ids.action_bar_backgrounds.resize(
+                    action_bar::ROWS,
+                    &mut ui_widgets.widget_id_generator(),
+                );
+            }
+
+            let font = self.fonts.cyri.conrod_id;
+            let font_size = self.fonts.cyri.scale(11);
+            let buttons = &self.ids.action_buttons;
+            let backgrounds = &self.ids.action_bar_backgrounds;
+
+            let primary_outcome = action_bar::Row {
+                items: &primary_items,
+                ids: &buttons[..action_bar::MAX_ROW_LEN],
+                background: backgrounds[0],
+                window: ui_widgets.window,
+                bottom_margin: action_bar::BOTTOM_MARGIN,
+                font,
+                font_size,
+            }
+            .draw(ui_widgets);
+
+            let mut secondary_outcome = action_bar::Outcome::default();
+            if !secondary_items.is_empty() {
+                secondary_outcome = action_bar::Row {
+                    items: &secondary_items,
+                    ids: &buttons[action_bar::MAX_ROW_LEN..],
+                    background: backgrounds[1],
+                    window: ui_widgets.window,
+                    bottom_margin: action_bar::BOTTOM_MARGIN + action_bar::ROW_STEP,
+                    font,
+                    font_size,
+                }
+                .draw(ui_widgets);
+            }
+
+            if primary_outcome.more_clicked {
+                self.action_bar_expanded = !self.action_bar_expanded;
+            }
+            action_pressed.extend(primary_outcome.held);
+            action_pressed.extend(secondary_outcome.held);
+        }
+
+        // Turn button presses into the same inputs the keys would send. Presses
+        // are sent once when the button goes down, and releases when it comes up
+        // or disappears from the bar while held.
+        for input in action_pressed.difference(&self.action_held) {
+            events.push(Event::ActionInput {
+                input: *input,
+                state: true,
+            });
+        }
+        for input in self.action_held.difference(&action_pressed) {
+            events.push(Event::ActionInput {
+                input: *input,
+                state: false,
+            });
+        }
+        self.action_held = action_pressed;
 
         // Buffs
         if let (Some(player_buffs), Some(health), Some(energy), Some(poise)) = (
@@ -5373,6 +5495,18 @@ impl Hud {
 
         // Optimization: skip maintaining UI when it's off.
         if !self.show.ui {
+            // Buttons are not drawn while the UI is hidden, so release anything
+            // that was still held on the action bar to avoid leaving an input
+            // (e.g. Block) stuck on.
+            let releases: Vec<Event> = self
+                .action_held
+                .drain()
+                .map(|input| Event::ActionInput {
+                    input,
+                    state: false,
+                })
+                .collect();
+            self.events.extend(releases);
             return std::mem::take(&mut self.events);
         }
 

@@ -115,3 +115,8 @@ hud-pet = 摸摸
 hud-follow = 跟随
 hud-stay = 停留
 hud-read = 阅读
+# 屏幕动作栏
+hud-action-sheathe = 收起武器
+hud-action-draw = 拔出武器
+hud-action-more = 更多
+hud-action-less = 收起
