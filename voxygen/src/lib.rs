@@ -32,10 +32,10 @@ pub mod run;
 pub mod scene;
 pub mod session;
 pub mod settings;
-#[cfg(any(target_os = "android", test))]
-mod touch_controls;
 #[cfg(feature = "singleplayer")]
 pub mod singleplayer;
+#[cfg(any(target_os = "android", test))]
+mod touch_controls;
 pub mod window;
 
 /// Entry point used by Android's NativeActivity loader.

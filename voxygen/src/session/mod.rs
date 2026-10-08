@@ -36,6 +36,8 @@ use common::{
 use common_base::{prof_span, span};
 use common_net::{msg::server::InviteAnswer, sync::WorldSyncExt};
 
+#[cfg(target_os = "android")]
+use crate::touch_controls::{self, TouchActionPage, TouchButtonAction};
 use crate::{
     Direction, GlobalState, PlayState, PlayStateResult,
     audio::sfx::SfxEvent,
@@ -60,8 +62,6 @@ use settings_change::Language::ChangeLanguage;
 use target::targets_under_cursor;
 #[cfg(feature = "egui-ui")]
 use voxygen_egui::EguiDebugInfo;
-#[cfg(target_os = "android")]
-use crate::touch_controls::{self, TouchActionPage, TouchButtonAction};
 #[cfg(target_os = "android")]
 use winit::event::TouchPhase;
 

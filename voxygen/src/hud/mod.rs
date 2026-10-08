@@ -1640,7 +1640,14 @@ impl Hud {
                     .set(self.ids.android_touch_controls[index], ui_widgets);
 
                 let label = match button.label {
-                    TouchButtonLabel::Static(label) => Cow::Borrowed(label),
+                    TouchButtonLabel::HotbarDigit => Cow::Borrowed(match button.action {
+                        TouchButtonAction::Input(GameInput::Slot1) => "1",
+                        TouchButtonAction::Input(GameInput::Slot2) => "2",
+                        TouchButtonAction::Input(GameInput::Slot3) => "3",
+                        TouchButtonAction::Input(GameInput::Slot4) => "4",
+                        TouchButtonAction::Input(GameInput::Slot5) => "5",
+                        _ => "",
+                    }),
                     TouchButtonLabel::LocalizedInput => match button.action {
                         TouchButtonAction::Input(input) => {
                             i18n.get_msg(input.get_localization_key())

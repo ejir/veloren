@@ -43,8 +43,8 @@ pub enum TouchButtonAction {
 
 #[derive(Clone, Copy, Debug)]
 pub enum TouchButtonLabel {
-    /// Language-neutral label, used for hotbar digits.
-    Static(&'static str),
+    /// Language-neutral digit label, used for hotbar slots.
+    HotbarDigit,
     /// Resolve the label from the button's `GameInput` localization key.
     LocalizedInput,
     /// A language-neutral page arrow and page count.
@@ -75,11 +75,11 @@ impl TouchButton {
 
     const fn action(input: GameInput, x: f32) -> Self {
         let label = match input {
-            GameInput::Slot1 => TouchButtonLabel::Static("1"),
-            GameInput::Slot2 => TouchButtonLabel::Static("2"),
-            GameInput::Slot3 => TouchButtonLabel::Static("3"),
-            GameInput::Slot4 => TouchButtonLabel::Static("4"),
-            GameInput::Slot5 => TouchButtonLabel::Static("5"),
+            GameInput::Slot1
+            | GameInput::Slot2
+            | GameInput::Slot3
+            | GameInput::Slot4
+            | GameInput::Slot5 => TouchButtonLabel::HotbarDigit,
             _ => TouchButtonLabel::LocalizedInput,
         };
         Self {
@@ -116,8 +116,11 @@ const ACTION_BUTTON_COUNT: usize = 5;
 pub const BUTTON_COUNT: usize = FIXED_BUTTONS.len() + ACTION_BUTTON_COUNT + 1;
 
 /// Center and diameter of the left-side virtual movement stick.
+#[cfg(target_os = "android")]
 pub const MOVE_STICK_X: f32 = 0.20;
+#[cfg(target_os = "android")]
 pub const MOVE_STICK_Y: f32 = 0.76;
+#[cfg(target_os = "android")]
 pub const MOVE_STICK_DIAMETER: f32 = 0.34;
 
 /// Action-button locations are shared with the HUD drawing code, keeping the
@@ -249,10 +252,8 @@ mod tests {
 
     #[test]
     fn action_pages_reuse_the_same_five_positions() {
-        let positions = |page| {
-            action_buttons(page)
-                .map(|button| (button.x, button.y, button.diameter))
-        };
+        let positions =
+            |page| action_buttons(page).map(|button| (button.x, button.y, button.diameter));
         let first = positions(TouchActionPage::Hotbar);
         for page in PAGES {
             assert_eq!(positions(page), first);
@@ -267,10 +268,7 @@ mod tests {
         let height = 1080.0;
         let center = Vec2::new(button.x * width, button.y * height);
 
-        assert_eq!(
-            button_at(center, width, height, page),
-            Some(button.action)
-        );
+        assert_eq!(button_at(center, width, height, page), Some(button.action));
         assert_eq!(
             button_at(
                 Vec2::new(PAGE_BUTTON.x * width, PAGE_BUTTON.y * height),
@@ -291,26 +289,47 @@ mod tests {
 
     #[test]
     fn page_and_action_buttons_have_labels() {
-        assert!(FIXED_BUTTONS
-            .iter()
-            .all(|button| matches!(button.label, TouchButtonLabel::LocalizedInput)));
-        assert!(action_buttons(TouchActionPage::Hotbar)
-            .iter()
-            .all(|button| matches!(button.label, TouchButtonLabel::Static(_))));
-        assert!(action_buttons(TouchActionPage::Combat)
-            .iter()
-            .all(|button| matches!(button.label, TouchButtonLabel::LocalizedInput)));
+        assert!(
+            FIXED_BUTTONS
+                .iter()
+                .all(|button| matches!(button.label, TouchButtonLabel::LocalizedInput))
+        );
+        assert!(
+            action_buttons(TouchActionPage::Hotbar)
+                .iter()
+                .all(|button| matches!(button.label, TouchButtonLabel::HotbarDigit))
+        );
+        assert!(
+            action_buttons(TouchActionPage::Combat)
+                .iter()
+                .all(|button| matches!(button.label, TouchButtonLabel::LocalizedInput))
+        );
         assert!(matches!(
-            visible_buttons(TouchActionPage::Hotbar).last().unwrap().label,
+            visible_buttons(TouchActionPage::Hotbar)
+                .last()
+                .unwrap()
+                .label,
             TouchButtonLabel::PageIndicator
         ));
     }
 
     #[test]
     fn movement_stick_accepts_the_lower_left_region() {
-        assert!(is_movement_stick_zone(Vec2::new(20.0, 900.0), 1000.0, 1000.0));
-        assert!(!is_movement_stick_zone(Vec2::new(900.0, 900.0), 1000.0, 1000.0));
-        assert!(!is_movement_stick_zone(Vec2::new(20.0, 100.0), 1000.0, 1000.0));
+        assert!(is_movement_stick_zone(
+            Vec2::new(20.0, 900.0),
+            1000.0,
+            1000.0
+        ));
+        assert!(!is_movement_stick_zone(
+            Vec2::new(900.0, 900.0),
+            1000.0,
+            1000.0
+        ));
+        assert!(!is_movement_stick_zone(
+            Vec2::new(20.0, 100.0),
+            1000.0,
+            1000.0
+        ));
     }
 
     #[test]
