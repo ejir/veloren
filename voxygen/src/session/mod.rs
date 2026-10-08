@@ -108,7 +108,7 @@ fn android_touch_button(
     position: Vec2<f32>,
     width: f32,
     height: f32,
-) -> Option<crate::hud::touch_buttons::Action> {
+) -> Option<crate::hud::touch_buttons::Kind> {
     regions.iter().find_map(|region| {
         let center = Vec2::new(region.center.x * width, region.center.y * height);
         let radius = region.radius * height;
@@ -286,18 +286,18 @@ impl SessionState {
 
         match phase {
             TouchPhase::Started => {
-                use crate::hud::touch_buttons::Action;
+                use crate::hud::touch_buttons::Kind;
                 let control = if let Some(action) =
                     android_touch_button(self.hud.touch_regions(), position, width, height)
                 {
                     match action {
-                        Action::Input(button) => {
+                        Kind::Input(button) => {
                             global_state
                                 .window
                                 .send_event(Event::InputUpdate(button, true));
                             AndroidTouchControl::Button(button)
                         },
-                        Action::More => {
+                        Kind::More => {
                             self.hud.toggle_touch_more();
                             AndroidTouchControl::More
                         },
@@ -2222,13 +2222,6 @@ impl PlayState for SessionState {
                     },
                     HudEvent::TradeAction(action) => {
                         self.client.borrow_mut().perform_trade_action(action);
-                    },
-                    HudEvent::ActionInput { input, state } => {
-                        // Replay the action bar press as the matching key press, so it
-                        // goes through the same handling as the keyboard.
-                        global_state
-                            .window
-                            .send_event(Event::InputUpdate(input, state));
                     },
                     HudEvent::Ability { idx, state } => {
                         self.client.borrow_mut().handle_input(

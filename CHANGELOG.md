@@ -14,8 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Touch controls on Android now show context buttons (gliding, lantern, sheathing and drawing weapons, blocking, zoom) only when they apply, using the same rules as the on-screen action bar. Less common actions (sneaking, sitting, crawling, dancing, greeting, zoom lock) are under a "More" button, and labels are localized.
-- On-screen action bar with buttons for gliding, blocking, sheathing weapons, toggling the lantern, camera zoom, and other actions. Buttons only appear when relevant to the current state, less common actions are under "More", and labels are localized.
+- Touch controls on Android now show context buttons (gliding, lantern, sheathing and drawing weapons, blocking, zoom) only when they apply. Less common actions (sneaking, sitting, crawling, dancing, greeting, zoom lock) are under a "More" button, and labels are localized.
 - Translators can now use fragment-based templates for modular weapons.
 - Airship captains can now be asked where they're currently heading, and where they're heading after reaching the current destination.
 - Courier, fetch, and messenger quests that can be started by talking to various civilized NPC's that can afford to pay you to get the job done.

@@ -5,27 +5,161 @@
 //! session hit-tests the same regions, so the two cannot drift apart.
 //!
 //! - Fixed buttons (movement, combat, skill slots and menus) are always shown.
-//! - Context buttons are shown only while the action bar offers their action,
-//!   so they appear and disappear with the state (e.g. Glide only with a glider).
-//!   They reuse [`action_bar::layout`] for the rules, and its i18n keys for the
-//!   labels. Their actions sit behind a "More" button, like the action bar's
-//!   secondary row, so the screen does not fill up with buttons.
+//! - Context buttons are shown only while [`layout`] offers their action, so
+//!   they appear and disappear with the state (e.g. Glide only with a glider).
+//!   Less common actions sit behind a "More" button, so the screen does not
+//!   fill up with buttons.
 
-use super::action_bar::{self, Context, Kind, Spec};
 use crate::game_input::GameInput;
 use vek::Vec2;
 
-/// Diameter of the round context buttons, as a fraction of the screen height.
-const CONTEXT_DIAMETER: f32 = 0.15;
-
 /// What a button does when tapped.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Action {
+pub enum Kind {
     /// Sends the input exactly like pressing its key.
     Input(GameInput),
-    /// Shows or hides the secondary row, like "More" on the action bar.
+    /// Shows or hides the secondary row.
     More,
 }
+
+/// Facts about the player that decide which actions are offered.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Context {
+    /// The player has a living character that can take actions.
+    pub controlling: bool,
+    pub riding: bool,
+    pub wielding: bool,
+    pub gliding: bool,
+    /// A glider is equipped, so gliding can start.
+    pub has_glider: bool,
+    /// A lantern is equipped, so the lantern can be turned on.
+    pub has_lantern: bool,
+    pub lantern_on: bool,
+    pub sneaking: bool,
+    pub sitting: bool,
+    pub crawling: bool,
+    pub dancing: bool,
+    pub zoom_locked: bool,
+}
+
+/// Describes one button before its text is localised.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Spec {
+    pub kind: Kind,
+    /// Fluent message id for the button name.
+    pub label_key: &'static str,
+    /// Shows the button highlighted, e.g. while gliding.
+    pub active: bool,
+    /// Disabled buttons are not offered.
+    pub enabled: bool,
+}
+
+impl Spec {
+    fn input(input: GameInput, label_key: &'static str, active: bool, enabled: bool) -> Self {
+        Self {
+            kind: Kind::Input(input),
+            label_key,
+            active,
+            enabled,
+        }
+    }
+}
+
+/// Returns the primary and secondary actions for the given state.
+///
+/// The secondary actions are empty unless `expanded` is set.
+pub fn layout(ctx: &Context, expanded: bool) -> (Vec<Spec>, Vec<Spec>) {
+    let mut primary = Vec::new();
+    let mut secondary = Vec::new();
+
+    if ctx.controlling && !ctx.riding {
+        if ctx.gliding {
+            primary.push(Spec::input(GameInput::Glide, "gameinput-glide", true, true));
+        } else {
+            primary.push(Spec::input(
+                GameInput::ToggleWield,
+                if ctx.wielding {
+                    "hud-action-sheathe"
+                } else {
+                    "hud-action-draw"
+                },
+                ctx.wielding,
+                true,
+            ));
+            if ctx.wielding {
+                primary.push(Spec::input(GameInput::Block, "gameinput-block", false, true));
+            }
+            primary.push(Spec::input(GameInput::Roll, "gameinput-roll", false, true));
+            primary.push(Spec::input(GameInput::Jump, "gameinput-jump", false, true));
+            primary.push(Spec::input(
+                GameInput::Glide,
+                "gameinput-glide",
+                false,
+                ctx.has_glider,
+            ));
+        }
+        primary.push(Spec::input(
+            GameInput::ToggleLantern,
+            "gameinput-togglelantern",
+            ctx.lantern_on,
+            ctx.has_lantern || ctx.lantern_on,
+        ));
+    }
+
+    primary.push(Spec::input(GameInput::ZoomIn, "gameinput-zoomin", false, true));
+    primary.push(Spec::input(GameInput::ZoomOut, "gameinput-zoomout", false, true));
+
+    if ctx.controlling && !ctx.riding && !ctx.gliding {
+        secondary.push(Spec::input(
+            GameInput::Sneak,
+            "gameinput-sneak",
+            ctx.sneaking,
+            true,
+        ));
+        secondary.push(Spec::input(GameInput::Sit, "gameinput-sit", ctx.sitting, true));
+        secondary.push(Spec::input(
+            GameInput::Crawl,
+            "gameinput-crawl",
+            ctx.crawling,
+            true,
+        ));
+        secondary.push(Spec::input(
+            GameInput::Dance,
+            "gameinput-dance",
+            ctx.dancing,
+            true,
+        ));
+        secondary.push(Spec::input(
+            GameInput::Greet,
+            "gameinput-greet",
+            false,
+            true,
+        ));
+    }
+    secondary.push(Spec::input(
+        GameInput::ZoomLock,
+        "gameinput-zoomlock",
+        ctx.zoom_locked,
+        true,
+    ));
+
+    primary.push(Spec {
+        kind: Kind::More,
+        label_key: if expanded {
+            "hud-action-less"
+        } else {
+            "hud-action-more"
+        },
+        active: expanded,
+        enabled: true,
+    });
+
+    let secondary = if expanded { secondary } else { Vec::new() };
+    (primary, secondary)
+}
+
+/// Diameter of the round context buttons, as a fraction of the screen height.
+const CONTEXT_DIAMETER: f32 = 0.15;
 
 /// The text on a button.
 #[derive(Clone, Copy)]
@@ -41,101 +175,101 @@ enum Label {
 /// Positions are fractions of the screen: `x` of the width, `y` of the height
 /// measured from the top, and `diameter` of the height. The movement stick has
 /// no action; the session handles the left half of the screen itself.
-const FIXED: [(Option<Action>, Label, f32, f32, f32); 15] = [
+const FIXED: [(Option<Kind>, Label, f32, f32, f32); 15] = [
     (None, Label::Key("hud-touch-move"), 0.20, 0.76, 0.34),
     (
-        Some(Action::Input(GameInput::Primary)),
+        Some(Kind::Input(GameInput::Primary)),
         Label::Key("gameinput-primary"),
         0.90,
         0.78,
         0.15,
     ),
     (
-        Some(Action::Input(GameInput::Secondary)),
+        Some(Kind::Input(GameInput::Secondary)),
         Label::Key("hud-touch-alt"),
         0.76,
         0.85,
         0.15,
     ),
     (
-        Some(Action::Input(GameInput::Jump)),
+        Some(Kind::Input(GameInput::Jump)),
         Label::Key("gameinput-jump"),
         0.76,
         0.66,
         0.15,
     ),
     (
-        Some(Action::Input(GameInput::Interact)),
+        Some(Kind::Input(GameInput::Interact)),
         Label::Key("gameinput-interact"),
         0.90,
         0.57,
         0.15,
     ),
     (
-        Some(Action::Input(GameInput::Roll)),
+        Some(Kind::Input(GameInput::Roll)),
         Label::Key("gameinput-roll"),
         0.76,
         0.47,
         0.15,
     ),
     (
-        Some(Action::Input(GameInput::Slot1)),
+        Some(Kind::Input(GameInput::Slot1)),
         Label::Symbol("1"),
         0.50,
         0.26,
         0.10,
     ),
     (
-        Some(Action::Input(GameInput::Slot2)),
+        Some(Kind::Input(GameInput::Slot2)),
         Label::Symbol("2"),
         0.60,
         0.26,
         0.10,
     ),
     (
-        Some(Action::Input(GameInput::Slot3)),
+        Some(Kind::Input(GameInput::Slot3)),
         Label::Symbol("3"),
         0.70,
         0.26,
         0.10,
     ),
     (
-        Some(Action::Input(GameInput::Slot4)),
+        Some(Kind::Input(GameInput::Slot4)),
         Label::Symbol("4"),
         0.80,
         0.26,
         0.10,
     ),
     (
-        Some(Action::Input(GameInput::Slot5)),
+        Some(Kind::Input(GameInput::Slot5)),
         Label::Symbol("5"),
         0.90,
         0.26,
         0.10,
     ),
     (
-        Some(Action::Input(GameInput::Inventory)),
+        Some(Kind::Input(GameInput::Inventory)),
         Label::Key("gameinput-inventory"),
         0.56,
         0.075,
         0.09,
     ),
     (
-        Some(Action::Input(GameInput::Diary)),
+        Some(Kind::Input(GameInput::Diary)),
         Label::Key("gameinput-diary"),
         0.66,
         0.075,
         0.09,
     ),
     (
-        Some(Action::Input(GameInput::Settings)),
+        Some(Kind::Input(GameInput::Settings)),
         Label::Key("gameinput-settings"),
         0.76,
         0.075,
         0.09,
     ),
     (
-        Some(Action::Input(GameInput::Escape)),
+        Some(Kind::Input(GameInput::Escape)),
         Label::Key("hud-touch-menu"),
         0.86,
         0.075,
@@ -179,7 +313,7 @@ pub struct Shown {
     /// Stable slot index, used to pick the widget ids.
     pub index: usize,
     /// `None` for purely visual buttons (the movement stick).
-    pub action: Option<Action>,
+    pub action: Option<Kind>,
     /// Centre as fractions of the screen (x of width, y of height from top).
     pub center: Vec2<f32>,
     /// Diameter as a fraction of the screen height.
@@ -191,7 +325,7 @@ pub struct Shown {
 
 /// A region the session can hit-test, in the same fractions as [`Shown`].
 pub struct Region {
-    pub action: Action,
+    pub action: Kind,
     pub center: Vec2<f32>,
     /// Radius as a fraction of the screen height.
     pub radius: f32,
@@ -199,7 +333,7 @@ pub struct Region {
 
 /// Returns the buttons to show for the current state.
 ///
-/// `expanded` is the state of the "More" button, shared with the action bar.
+/// `expanded` is the state of the "More" button.
 pub fn shown(ctx: &Context, expanded: bool, localize: impl Fn(&str) -> String) -> Vec<Shown> {
     let mut shown: Vec<Shown> = FIXED
         .iter()
@@ -217,15 +351,12 @@ pub fn shown(ctx: &Context, expanded: bool, localize: impl Fn(&str) -> String) -
         })
         .collect();
 
-    let (primary, secondary) = action_bar::layout(ctx, expanded);
+    let (primary, secondary) = layout(ctx, expanded);
     for spec in primary.iter().chain(&secondary) {
         if let Some((index, x, y)) = slot_for(spec, ctx) {
             shown.push(Shown {
                 index,
-                action: Some(match spec.kind {
-                    Kind::Input(input) => Action::Input(input),
-                    Kind::More => Action::More,
-                }),
+                action: Some(spec.kind),
                 center: Vec2::new(x, y),
                 diameter: CONTEXT_DIAMETER,
                 label: localize(spec.label_key),
