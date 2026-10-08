@@ -163,7 +163,6 @@ pub enum Event {
     ShowRules,
 }
 
-#[expect(clippy::large_enum_variant)]
 enum Mode {
     Select {
         info_content: Option<InfoContent>,
@@ -568,13 +567,13 @@ impl Controls {
 
                 let num = client.character_list().characters.len();
                 let characters = {
-                    let characters = &client.character_list().characters;
+                    let character_items = &client.character_list().characters;
                     // Ensure we have enough button states
                     const CHAR_BUTTONS: usize = 3;
                     character_buttons.resize_with(num * CHAR_BUTTONS, Default::default);
 
                     // Character Selection List
-                    let characters = characters
+                    character_items
                         .iter()
                         .zip(character_buttons.chunks_exact_mut(CHAR_BUTTONS))
                         .filter_map(|(character, buttons)| {
@@ -706,8 +705,7 @@ impl Controls {
                                 .into()
                             },
                         )
-                        .collect::<Vec<_>>();
-                    characters
+                        .collect::<Vec<_>>()
                 };
 
                 // Keep the create button outside the character list so it stays
