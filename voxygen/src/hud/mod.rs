@@ -160,6 +160,27 @@ const TEXT_COLOR_GREY: Color = Color::Rgba(1.0, 1.0, 1.0, 0.5);
 const TEXT_COLOR_3: Color = Color::Rgba(1.0, 1.0, 1.0, 0.1);
 const TEXT_BIND_CONFLICT_COLOR: Color = Color::Rgba(1.0, 0.0, 0.0, 1.0);
 const BLACK: Color = Color::Rgba(0.0, 0.0, 0.0, 1.0);
+
+/// A larger close target for windows when using a touchscreen.
+const CLOSE_BUTTON_SIZE: f64 = if cfg!(target_os = "android") { 72.0 } else { 24.0 };
+
+fn platform_hud_scale_mode(mode: ScaleMode) -> ScaleMode {
+    // DpiFactor is appropriate for the responsive Iced menus, but this legacy
+    // HUD has fixed 16:9 pixel-sized panels. Keep it in the relative mode that
+    // fits those panels on a phone; the Android-only extra scale in Ui::new
+    // makes the result slightly larger than the desktop layout.
+    #[cfg(target_os = "android")]
+    {
+        match mode {
+            ScaleMode::DpiFactor => ScaleMode::RelativeToWindow([1920.0, 1080.0].into()),
+            mode => mode,
+        }
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        mode
+    }
+}
 //const BG_COLOR: Color = Color::Rgba(1.0, 1.0, 1.0, 0.8);
 const HP_COLOR: Color = Color::Rgba(0.33, 0.63, 0.0, 1.0);
 const LOW_HP_COLOR: Color = Color::Rgba(0.93, 0.59, 0.03, 1.0);
@@ -1378,7 +1399,7 @@ impl Hud {
         let settings = &global_state.settings;
 
         let mut ui = Ui::new(window).unwrap();
-        ui.set_scaling_mode(settings.interface.ui_scale);
+        ui.set_scaling_mode(platform_hud_scale_mode(settings.interface.ui_scale));
         // Generate ids.
         let ids = Ids::new(ui.id_generator());
         // Load world map
@@ -1527,18 +1548,9 @@ impl Hud {
         // instead of being swallowed by the overlay backdrops.
         #[cfg(target_os = "android")]
         if self.show.ingame && self.show.want_grab {
-            // Six combat/movement controls plus four menu controls, each with a
-            // backdrop rectangle and a centered label.
-            const TOUCH_CONTROL_COUNT: usize = 20;
-            if self.ids.android_touch_controls.len() < TOUCH_CONTROL_COUNT {
-                self.ids
-                    .android_touch_controls
-                    .resize(TOUCH_CONTROL_COUNT, &mut ui_widgets.widget_id_generator());
-            }
-
-            // The touch hit regions live in physical screen coordinates; these
-            // fractional positions keep the visual controls aligned at any density.
-            // They must match `android_touch_button` in session.
+            // Movement/combat, five skill slots and menu actions. Each target has
+            // a translucent backdrop and label; the first half of this array is
+            // kept in sync with android_touch_button in session.
             let controls = [
                 (0.20, 0.76, 0.34, "MOVE"),
                 (0.90, 0.78, 0.15, "ATK"),
@@ -1546,11 +1558,25 @@ impl Hud {
                 (0.76, 0.66, 0.15, "JUMP"),
                 (0.90, 0.57, 0.15, "USE"),
                 (0.76, 0.47, 0.15, "ROLL"),
+                (0.50, 0.26, 0.10, "1"),
+                (0.60, 0.26, 0.10, "2"),
+                (0.70, 0.26, 0.10, "3"),
+                (0.80, 0.26, 0.10, "4"),
+                (0.90, 0.26, 0.10, "5"),
                 (0.56, 0.075, 0.09, "BAG"),
                 (0.66, 0.075, 0.09, "SKILL"),
                 (0.76, 0.075, 0.09, "SET"),
                 (0.86, 0.075, 0.09, "MENU"),
             ];
+            let touch_control_count = controls.len() * 2;
+            if self.ids.android_touch_controls.len() < touch_control_count {
+                self.ids
+                    .android_touch_controls
+                    .resize(touch_control_count, &mut ui_widgets.widget_id_generator());
+            }
+
+            // The touch hit regions live in physical screen coordinates; these
+            // fractional positions keep the visual controls aligned at any density.
             let label_offset = controls.len();
             for (index, (x, y, diameter, label)) in controls.into_iter().enumerate() {
                 let center = Vec2::new((x - 0.5) * ui_widgets.win_w, (0.5 - y) * ui_widgets.win_h);
@@ -4868,7 +4894,8 @@ impl Hud {
     }
 
     pub fn set_scaling_mode(&mut self, scale_mode: ScaleMode) {
-        self.ui.set_scaling_mode(scale_mode);
+        self.ui
+            .set_scaling_mode(platform_hud_scale_mode(scale_mode));
     }
 
     pub fn scale_change(&mut self, scale_change: ScaleChange) -> ScaleMode {
@@ -4877,7 +4904,8 @@ impl Hud {
             ScaleChange::ToAbsolute => self.ui.scale().scaling_mode_as_absolute(),
             ScaleChange::ToRelative => self.ui.scale().scaling_mode_as_relative(),
         };
-        self.ui.set_scaling_mode(scale_mode);
+        self.ui
+            .set_scaling_mode(platform_hud_scale_mode(scale_mode));
         scale_mode
     }
 

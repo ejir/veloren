@@ -34,7 +34,8 @@ use crate::{
 };
 
 use super::{
-    Hud, HudInfo, Show, TEXT_COLOR, TEXT_GRAY_COLOR, TradeAmountInput, UI_HIGHLIGHT_0, UI_MAIN,
+    CLOSE_BUTTON_SIZE, Hud, HudInfo, Show, TEXT_COLOR, TEXT_GRAY_COLOR, TradeAmountInput,
+    UI_HIGHLIGHT_0, UI_MAIN,
     img_ids::{Imgs, ImgsRot},
     item_imgs::ItemImgs,
     slots::{SlotKind, SlotManager, TradeSlot},
@@ -851,7 +852,7 @@ impl<'a> Trade<'a> {
         ui: &mut UiCell<'_>,
     ) -> Option<TradeEvent> {
         if Button::image(self.imgs.close_btn)
-            .w_h(24.0, 25.0)
+            .w_h(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
             .hover_image(self.imgs.close_btn_hover)
             .press_image(self.imgs.close_btn_press)
             .top_right_with_margins_on(state.ids.bg, 0.0, 0.0)

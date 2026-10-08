@@ -105,6 +105,7 @@ fn android_touch_button(position: Vec2<f32>, width: f32, height: f32) -> Option<
     // Positions must match the touch overlay drawn by the HUD.
     let combat_radius = height * 0.075;
     let menu_radius = height * 0.05;
+    let skill_radius = height * 0.05;
     [
         (
             GameInput::Primary,
@@ -150,6 +151,31 @@ fn android_touch_button(position: Vec2<f32>, width: f32, height: f32) -> Option<
             GameInput::Escape,
             Vec2::new(width * 0.86, height * 0.075),
             menu_radius,
+        ),
+        (
+            GameInput::Slot1,
+            Vec2::new(width * 0.50, height * 0.26),
+            skill_radius,
+        ),
+        (
+            GameInput::Slot2,
+            Vec2::new(width * 0.60, height * 0.26),
+            skill_radius,
+        ),
+        (
+            GameInput::Slot3,
+            Vec2::new(width * 0.70, height * 0.26),
+            skill_radius,
+        ),
+        (
+            GameInput::Slot4,
+            Vec2::new(width * 0.80, height * 0.26),
+            skill_radius,
+        ),
+        (
+            GameInput::Slot5,
+            Vec2::new(width * 0.90, height * 0.26),
+            skill_radius,
         ),
     ]
     .into_iter()

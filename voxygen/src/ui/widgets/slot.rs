@@ -221,9 +221,12 @@ where
         let slot_ids = core::mem::take(&mut self.slot_ids);
         let slots = core::mem::take(&mut self.slots);
 
-        // Detect drops by of selected item by clicking in empty space
+        // Detect drops by clicking or tapping in empty space. Touchscreens do
+        // not produce mouse clicks, so treating taps as the left-click
+        // equivalent is required for mobile inventory interaction.
         if let ManagerState::Selected(_, slot) = self.state
-            && ui.widget_input(ui.window).clicks().left().next().is_some()
+            && (ui.widget_input(ui.window).clicks().left().next().is_some()
+                || ui.widget_input(ui.window).taps().next().is_some())
         {
             self.state = ManagerState::Idle;
             self.events.push(Event::Dropped(slot));
@@ -368,20 +371,27 @@ where
 
         let input = ui.widget_input(widget);
         let click_count = input.clicks().left().count();
-        if click_count > 0 {
+        let tap_count = input.taps().count();
+        let interaction_count = click_count + tap_count;
+        if interaction_count > 0 {
             self.state = if let ManagerState::Selected(id, other_slot) = self.state {
                 if id != widget {
-                    // Swap
+                    // A tap on a second slot is the touch-friendly equivalent
+                    // of dropping a dragged item or ability onto that slot.
                     if slot != other_slot {
                         self.events.push(Event::Dragged(other_slot, slot));
                     }
-                    if click_count == 1 {
+                    if interaction_count == 1 {
                         ManagerState::Idle
                     } else {
                         ManagerState::Selected(widget, slot)
                     }
                 } else {
-                    // Clicked widget was already selected; deselect widget
+                    // A second tap on the selected item is a quick-use action;
+                    // the context menu remains available after the first tap.
+                    if tap_count > 0 {
+                        self.events.push(Event::Used(slot));
+                    }
                     ManagerState::Idle
                 }
             } else {
@@ -389,7 +399,7 @@ where
                 if filled {
                     ManagerState::Selected(widget, slot)
                 } else {
-                    // Selected and then deselected with one or more clicks
+                    // Selected and then deselected with one or more interactions
                     ManagerState::Idle
                 }
             };

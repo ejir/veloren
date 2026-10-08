@@ -52,13 +52,18 @@ impl Scale {
 
     // Get scaling mode transformed into absolute scaling
     pub fn scaling_mode_as_absolute(&self) -> ScaleMode {
-        ScaleMode::Absolute(self.scale_factor_physical())
+        // Keep the platform-specific extra factor separate from the user's
+        // selected scale so toggling between modes does not apply it twice.
+        ScaleMode::Absolute(self.scale_factor_physical() / self.extra_factor)
     }
 
     // Get scaling mode transformed to be relative to the window with the same
     // aspect ratio as the current window
     pub fn scaling_mode_as_relative(&self) -> ScaleMode {
-        ScaleMode::RelativeToWindow(self.scaled_resolution())
+        // Relative dimensions are multiplied by `extra_factor` when converted
+        // back to a physical scale, so include it here to preserve the current
+        // rendered size.
+        ScaleMode::RelativeToWindow(self.scaled_resolution() * self.extra_factor)
     }
 
     /// Calculate factor to transform between physical coordinates and our

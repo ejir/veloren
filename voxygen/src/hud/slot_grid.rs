@@ -35,6 +35,11 @@ use specs::Entity as EcsEntity;
 use std::{borrow::Borrow, sync::Arc};
 use vek::Vec2;
 
+const CONTEXT_MENU_WIDTH: f64 = if cfg!(target_os = "android") { 180.0 } else { 130.0 };
+const CONTEXT_MENU_ITEM_HEIGHT: f64 = if cfg!(target_os = "android") { 48.0 } else { 25.0 };
+const CONTEXT_MENU_SPACING: f64 = if cfg!(target_os = "android") { 6.0 } else { 2.0 };
+const CONTEXT_MENU_FONT_SIZE: u32 = if cfg!(target_os = "android") { 18 } else { 12 };
+
 #[derive(PartialEq)]
 pub enum TabFilters {
     Gear,
@@ -527,7 +532,7 @@ impl<'a> Widget for SlotGrid<'a> {
             if selected == Some(inv_slot.into()) {
                 state.update(|s| {
                     s.active_context_slot = selected;
-                    let menu_width = 130.0;
+                    let menu_width = CONTEXT_MENU_WIDTH;
                     let offset = if x < self.columns / 2 {
                         self.slot_size // Place to the right
                     } else {
@@ -559,7 +564,8 @@ impl<'a> Widget for SlotGrid<'a> {
             let actions = [context_use, context_drop, context_cancel];
             // TODO: instead of storing [x,y] coordinates, consider storing the widget id
             let [x, y] = state.context_menu_pos;
-            let total_h = (actions.len() as f64 * 25.0) + ((actions.len() as f64 + 1.0) * 2.0);
+            let total_h = (actions.len() as f64 * CONTEXT_MENU_ITEM_HEIGHT)
+                + ((actions.len() as f64 + 1.0) * CONTEXT_MENU_SPACING);
 
             let event = ContextMenu::new(
                 self.global_state,
@@ -569,7 +575,7 @@ impl<'a> Widget for SlotGrid<'a> {
                 self.menu_events,
             )
             .top_left_with_margins_on(id, y, x)
-            .w_h(130.0, total_h)
+            .w_h(CONTEXT_MENU_WIDTH, total_h)
             .set(state.ids.context_menu, ui);
 
             if let Some(index) = event {
@@ -655,8 +661,8 @@ impl<'a, T: AsRef<str>> Widget for ContextMenu<'a, T> {
         } = args;
         let mut clicked_index = None;
 
-        let item_h = 25.0;
-        let spacing = 2.0;
+        let item_h = CONTEXT_MENU_ITEM_HEIGHT;
+        let spacing = CONTEXT_MENU_SPACING;
         let actions_len = self.actions.len();
 
         // MENU INPUTS: navigate up and down the list
@@ -718,7 +724,7 @@ impl<'a, T: AsRef<str>> Widget for ContextMenu<'a, T> {
                     }
                 )
                 .label(label.as_ref())
-                .label_font_size(self.fonts.cyri.scale(12))
+                .label_font_size(self.fonts.cyri.scale(CONTEXT_MENU_FONT_SIZE))
                 .label_font_id(self.fonts.cyri.conrod_id)
                 .label_color(
                     if active_btn && self.global_state.window.last_input_type_menu() {

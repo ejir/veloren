@@ -1,5 +1,5 @@
 use super::{
-    Show, TEXT_COLOR, TEXT_COLOR_3, UI_HIGHLIGHT_0, UI_MAIN,
+    CLOSE_BUTTON_SIZE, Show, TEXT_COLOR, TEXT_COLOR_3, UI_HIGHLIGHT_0, UI_MAIN,
     img_ids::{Imgs, ImgsRot},
 };
 use crate::{
@@ -166,7 +166,7 @@ impl Widget for Social<'_> {
             .set(state.ids.icon, ui);
         // X-Button
         if Button::image(self.imgs.close_btn)
-            .w_h(24.0, 25.0)
+            .w_h(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
             .hover_image(self.imgs.close_btn_hover)
             .press_image(self.imgs.close_btn_press)
             .top_right_with_margins_on(state.ids.bg, 0.0, 0.0)

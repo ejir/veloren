@@ -40,7 +40,7 @@ impl IcedUi {
     pub fn new(
         window: &mut Window,
         default_font: Font,
-        scale_mode: ScaleMode,
+        _scale_mode: ScaleMode,
     ) -> Result<Self, Error> {
         let scale_factor = window.scale_factor();
         let renderer = window.renderer_mut();
@@ -52,7 +52,7 @@ impl IcedUi {
         #[cfg(target_os = "android")]
         let (scale_mode, extra_factor) = (ScaleMode::DpiFactor, 1.0);
         #[cfg(not(target_os = "android"))]
-        let extra_factor = 1.2;
+        let (scale_mode, extra_factor) = (_scale_mode, 1.2);
         let scale = Scale::new(physical_resolution, scale_factor, scale_mode, extra_factor);
 
         let scaled_resolution = scale.scaled_resolution().map(|e| e as f32);
@@ -102,6 +102,15 @@ impl IcedUi {
     pub fn scale(&self) -> Scale { self.scale }
 
     pub fn set_scaling_mode(&mut self, mode: ScaleMode) {
+        // Relative-to-window scaling is based on desktop pixels. On Android the
+        // menu uses logical (density-independent) pixels so touch targets remain
+        // usable on high-density displays.
+        #[cfg(target_os = "android")]
+        let mode = match mode {
+            ScaleMode::RelativeToWindow(_) => ScaleMode::DpiFactor,
+            mode => mode,
+        };
+
         // Signal that change needs to be handled
         self.scale_changed |= self.scale.set_scaling_mode(mode);
     }

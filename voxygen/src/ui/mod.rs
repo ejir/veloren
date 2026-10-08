@@ -2,6 +2,7 @@ mod cache;
 mod event;
 pub mod graphic;
 mod scale;
+mod touch_scroll;
 mod widgets;
 #[macro_use]
 pub mod img_ids;
@@ -129,6 +130,8 @@ pub struct Ui {
     graphic_replaced: bool,
     // Scaling of the ui
     scale: Scale,
+    // Active touchscreen swipe used to emulate wheel scrolling.
+    touch_scroll: touch_scroll::TouchScrollTracker<conrod_core::input::touch::Id>,
     // Tooltips
     tooltip_manager: TooltipManager,
     // Item tooltips manager
@@ -142,11 +145,18 @@ impl Ui {
         let scale_factor = window.scale_factor();
         let renderer = window.renderer_mut();
         let physical_resolution = renderer.resolution();
+        // The legacy Conrod HUD uses a 16:9 pixel-based layout. Give it a modest
+        // mobile zoom so menus and touch targets are easier to read without
+        // allowing its largest fixed panel (the diary) to run off-screen.
+        #[cfg(target_os = "android")]
+        let extra_factor = 1.2;
+        #[cfg(not(target_os = "android"))]
+        let extra_factor = 1.0;
         let scale = Scale::new(
             physical_resolution,
             scale_factor,
             ScaleMode::Absolute(1.0),
-            1.0,
+            extra_factor,
         );
 
         let win_dims = scale.scaled_resolution().into_array();
@@ -186,6 +196,7 @@ impl Ui {
             need_cache_resize: false,
             graphic_replaced: false,
             scale,
+            touch_scroll: touch_scroll::TouchScrollTracker::default(),
             tooltip_manager,
             item_tooltip_manager,
             window_scissor: default_scissor(physical_resolution),
@@ -299,10 +310,50 @@ impl Ui {
                     self.window_resized = true;
                 }
             },
-            Input::Touch(touch) => self.ui.handle_event(Input::Touch(Touch {
-                xy: self.scale.scale_point(touch.xy.into()).into_array(),
-                ..touch
-            })),
+            Input::Touch(touch) => {
+                let mut touch = Touch {
+                    xy: self.scale.scale_point(touch.xy.into()).into_array(),
+                    ..touch
+                };
+                let id = touch.id;
+                let position = Vec2::new(touch.xy[0], touch.xy[1]);
+                let scroll_delta = match touch.phase {
+                    conrod_core::input::touch::Phase::Start => {
+                        self.touch_scroll.start(id, position);
+                        None
+                    },
+                    conrod_core::input::touch::Phase::Move => {
+                        self.touch_scroll.move_to(id, position)
+                    },
+                    conrod_core::input::touch::Phase::End => {
+                        if self.touch_scroll.finish(id) {
+                            // A swipe should scroll the panel, not also activate
+                            // the item or button where the finger was released.
+                            touch.phase = conrod_core::input::touch::Phase::Cancel;
+                        }
+                        None
+                    },
+                    conrod_core::input::touch::Phase::Cancel => {
+                        self.touch_scroll.finish(id);
+                        None
+                    },
+                };
+
+                self.ui.handle_event(Input::Touch(touch));
+                if let Some(delta) = scroll_delta {
+                    // Conrod scrollables listen for mouse-wheel motion. Keep the
+                    // virtual pointer at the finger and feed them the incremental
+                    // finger movement (Conrod's y axis points upwards).
+                    self.ui.handle_event(Input::Motion(Motion::MouseCursor {
+                        x: position.x,
+                        y: position.y,
+                    }));
+                    self.ui.handle_event(Input::Motion(Motion::Scroll {
+                        x: 0.0,
+                        y: delta.y,
+                    }));
+                }
+            },
             Input::Motion(motion) => self.ui.handle_event(Input::Motion(match motion {
                 Motion::MouseCursor { x, y } => {
                     let (x, y) = self.scale.scale_point(Vec2::new(x, y)).into_tuple();
