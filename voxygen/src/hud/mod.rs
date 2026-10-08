@@ -698,7 +698,7 @@ pub struct HudInfo<'a> {
     pub persistence_load_error: Option<SkillsPersistenceError>,
     pub key_state: &'a KeyState,
     #[cfg(target_os = "android")]
-    pub pressed_inputs: &'a HashSet<GameInput>,
+    pub pressed_inputs: &'a std::collections::HashSet<GameInput>,
 }
 
 #[derive(Clone)]
