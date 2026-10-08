@@ -563,7 +563,7 @@ impl Controls {
                 .center_y()
                 .width(Length::Fill);
 
-                let characters = {
+                let (characters, create_character_button) = {
                     let characters = &client.character_list().characters;
                     let num = characters.len();
                     // Ensure we have enough button states
@@ -571,7 +571,7 @@ impl Controls {
                     character_buttons.resize_with(num * CHAR_BUTTONS, Default::default);
 
                     // Character Selection List
-                    let mut characters = characters
+                    let characters = characters
                         .iter()
                         .zip(character_buttons.chunks_exact_mut(CHAR_BUTTONS))
                         .filter_map(|(character, buttons)| {
@@ -711,8 +711,9 @@ impl Controls {
                     } else {
                         (97, 255, 18)
                     };
-                    characters.push(
-                        AspectRatioContainer::new({
+                    // Kept outside the scrollable list (see below) so it stays visible even
+                    // when the list is long or the screen is short.
+                    let create_character_button: Element<'_, Message> = AspectRatioContainer::new({
                             let button = Button::new(
                                 new_character_button,
                                 Container::new(Text::new(
@@ -742,9 +743,8 @@ impl Controls {
                             }
                         })
                         .ratio_of_image(imgs.char_selection)
-                        .into(),
-                    );
-                    characters
+                        .into();
+                    (characters, create_character_button)
                 };
 
                 // TODO: could replace column with scrollable completely if it had a with
@@ -770,6 +770,10 @@ impl Controls {
                     .height(Length::Fill)
                     .center_x()
                     .into(),
+                    Container::new(create_character_button)
+                        .width(Length::Units(322))
+                        .center_x()
+                        .into(),
                     Image::new(imgs.frame_bottom)
                         .height(Length::Units(40))
                         .width(Length::Units(322))
