@@ -120,3 +120,8 @@ hud-action-sheathe = 收起武器
 hud-action-draw = 拔出武器
 hud-action-more = 更多
 hud-action-less = 收起
+# Short labels for the Android touch overlay
+hud-touch-glide = 滑翔
+hud-touch-lantern = 提灯
+hud-touch-wield = 收放
+hud-touch-sneak = 潜行

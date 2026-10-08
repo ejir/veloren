@@ -1570,9 +1570,19 @@ impl Hud {
         // instead of being swallowed by the overlay backdrops.
         #[cfg(target_os = "android")]
         if self.show.ingame && self.show.want_grab {
-            // Movement/combat, five skill slots and menu actions. Each target has
-            // a translucent backdrop and label; the first half of this array is
-            // kept in sync with android_touch_button in session.
+            // Movement/combat, five skill slots, menu actions and context actions.
+            // Each target has a translucent backdrop and label. Every entry must
+            // have the same position as the matching hit region in
+            // android_touch_button (session), which is what makes it work.
+            let (glide_label, lantern_label, wield_label, sneak_label) = {
+                let i18n = global_state.i18n.read();
+                (
+                    i18n.get_msg("hud-touch-glide").into_owned(),
+                    i18n.get_msg("hud-touch-lantern").into_owned(),
+                    i18n.get_msg("hud-touch-wield").into_owned(),
+                    i18n.get_msg("hud-touch-sneak").into_owned(),
+                )
+            };
             let controls = [
                 (0.20, 0.76, 0.34, "MOVE"),
                 (0.90, 0.78, 0.15, "ATK"),
@@ -1589,6 +1599,10 @@ impl Hud {
                 (0.66, 0.075, 0.09, "SKILL"),
                 (0.76, 0.075, 0.09, "SET"),
                 (0.86, 0.075, 0.09, "MENU"),
+                (0.66, 0.66, 0.15, glide_label.as_str()),
+                (0.66, 0.85, 0.15, lantern_label.as_str()),
+                (0.66, 0.47, 0.15, wield_label.as_str()),
+                (0.90, 0.415, 0.15, sneak_label.as_str()),
             ];
             let touch_control_count = controls.len() * 2;
             if self.ids.android_touch_controls.len() < touch_control_count {

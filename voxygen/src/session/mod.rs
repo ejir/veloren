@@ -177,6 +177,28 @@ fn android_touch_button(position: Vec2<f32>, width: f32, height: f32) -> Option<
             Vec2::new(width * 0.90, height * 0.26),
             skill_radius,
         ),
+        // Context actions that otherwise need a key: gliding, lantern, weapon
+        // sheathe/draw and sneaking. Keep in sync with the overlay in the HUD.
+        (
+            GameInput::Glide,
+            Vec2::new(width * 0.66, height * 0.66),
+            combat_radius,
+        ),
+        (
+            GameInput::ToggleLantern,
+            Vec2::new(width * 0.66, height * 0.85),
+            combat_radius,
+        ),
+        (
+            GameInput::ToggleWield,
+            Vec2::new(width * 0.66, height * 0.47),
+            combat_radius,
+        ),
+        (
+            GameInput::Sneak,
+            Vec2::new(width * 0.90, height * 0.415),
+            combat_radius,
+        ),
     ]
     .into_iter()
     .find_map(|(button, center, radius)| {

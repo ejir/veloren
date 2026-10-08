@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Touch controls on Android now include buttons for gliding, toggling the lantern, sheathing and drawing weapons, and sneaking.
 - On-screen action bar with buttons for gliding, blocking, sheathing weapons, toggling the lantern, camera zoom, and other actions. Buttons only appear when relevant to the current state, less common actions are under "More", and labels are localized.
 - Translators can now use fragment-based templates for modular weapons.
 - Airship captains can now be asked where they're currently heading, and where they're heading after reaching the current destination.
