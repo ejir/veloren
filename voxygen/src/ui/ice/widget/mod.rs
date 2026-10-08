@@ -6,8 +6,8 @@ pub mod image;
 pub mod mouse_detector;
 pub mod overlay;
 pub mod stack;
-pub mod touch_scrollable;
 pub mod tooltip;
+pub mod touch_scrollable;
 
 pub use self::{
     aspect_ratio_container::AspectRatioContainer,
@@ -16,6 +16,6 @@ pub use self::{
     image::Image,
     mouse_detector::MouseDetector,
     overlay::Overlay,
-    touch_scrollable::{TouchScrollState, TouchScrollable},
     tooltip::{Tooltip, TooltipManager},
+    touch_scrollable::{TouchScrollState, TouchScrollable},
 };

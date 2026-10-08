@@ -86,11 +86,7 @@ where
                 Event::Touch(touch::Event::FingerPressed { id, position })
             },
             Event::Touch(touch::Event::FingerMoved { id, position }) => {
-                if let Some(delta) = self
-                    .state
-                    .touch
-                    .move_to(id, tracker_position(position))
-                {
+                if let Some(delta) = self.state.touch.move_to(id, tracker_position(position)) {
                     // Don't also send the touch-move event: iced's Scrollable
                     // handles touch drags that start on empty space itself, but
                     // a child button captures the initial press. A wheel event

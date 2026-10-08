@@ -7,7 +7,8 @@ use crate::ui::{
         style,
         widget::{
             AspectRatioContainer, BackgroundContainer, Image, Padding, TouchScrollState,
-            TouchScrollable, compound_graphic::{CompoundGraphic, Graphic},
+            TouchScrollable,
+            compound_graphic::{CompoundGraphic, Graphic},
         },
     },
 };

@@ -14,7 +14,7 @@ use crate::{
             style,
             widget::{
                 AspectRatioContainer, BackgroundContainer, Image, MouseDetector, Overlay, Padding,
-                TouchScrollState, TouchScrollable, TooltipManager, mouse_detector,
+                TooltipManager, TouchScrollState, TouchScrollable, mouse_detector,
             },
         },
         img_ids::ImageGraphic,
@@ -707,6 +707,7 @@ impl Controls {
                             },
                         )
                         .collect::<Vec<_>>();
+                    characters
                 };
 
                 // Keep the create button outside the character list so it stays
@@ -733,9 +734,7 @@ impl Controls {
                             .press_image(imgs.char_selection_press)
                             .image_color(Rgba::new(color.0, color.1, color.2, 255))
                             .text_color(iced::Color::from_rgb8(color.0, color.1, color.2))
-                            .disabled_text_color(iced::Color::from_rgb8(
-                                color.0, color.1, color.2,
-                            )),
+                            .disabled_text_color(iced::Color::from_rgb8(color.0, color.1, color.2)),
                     )
                     .width(Length::Fill)
                     .height(Length::Fill);
