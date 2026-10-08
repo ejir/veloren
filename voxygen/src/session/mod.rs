@@ -96,6 +96,8 @@ enum AndroidTouchControl {
     Move { origin: Vec2<f32> },
     Look { last: Vec2<f32> },
     Button(GameInput),
+    /// The "More" button. Acts on press only and sends no input.
+    More,
 }
 
 /// Returns the touch button under `position`. The buttons come from the HUD,
@@ -106,11 +108,11 @@ fn android_touch_button(
     position: Vec2<f32>,
     width: f32,
     height: f32,
-) -> Option<GameInput> {
+) -> Option<crate::hud::touch_buttons::Action> {
     regions.iter().find_map(|region| {
         let center = Vec2::new(region.center.x * width, region.center.y * height);
         let radius = region.radius * height;
-        ((position - center).magnitude_squared() <= radius * radius).then_some(region.input)
+        ((position - center).magnitude_squared() <= radius * radius).then_some(region.action)
     })
 }
 
@@ -254,7 +256,7 @@ impl SessionState {
                 AndroidTouchControl::Button(button) => global_state
                     .window
                     .send_event(Event::InputUpdate(button, false)),
-                AndroidTouchControl::Look { .. } => {},
+                AndroidTouchControl::More | AndroidTouchControl::Look { .. } => {},
             }
         }
     }
@@ -284,13 +286,22 @@ impl SessionState {
 
         match phase {
             TouchPhase::Started => {
-                let control = if let Some(button) =
+                use crate::hud::touch_buttons::Action;
+                let control = if let Some(action) =
                     android_touch_button(self.hud.touch_regions(), position, width, height)
                 {
-                    global_state
-                        .window
-                        .send_event(Event::InputUpdate(button, true));
-                    AndroidTouchControl::Button(button)
+                    match action {
+                        Action::Input(button) => {
+                            global_state
+                                .window
+                                .send_event(Event::InputUpdate(button, true));
+                            AndroidTouchControl::Button(button)
+                        },
+                        Action::More => {
+                            self.hud.toggle_touch_more();
+                            AndroidTouchControl::More
+                        },
+                    }
                 } else if position.x < width * 0.42 && position.y > height * 0.32 {
                     global_state
                         .window
@@ -337,7 +348,7 @@ impl SessionState {
                                 delta.y * sensitivity * invert_y,
                             )));
                         },
-                        AndroidTouchControl::Button(_) => {},
+                        AndroidTouchControl::Button(_) | AndroidTouchControl::More => {},
                     }
                 }
             },
@@ -355,7 +366,7 @@ impl SessionState {
                         AndroidTouchControl::Button(button) => global_state
                             .window
                             .send_event(Event::InputUpdate(button, false)),
-                        AndroidTouchControl::Look { .. } => {},
+                        AndroidTouchControl::More | AndroidTouchControl::Look { .. } => {},
                     }
                 }
             },

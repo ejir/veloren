@@ -118,3 +118,8 @@ hud-init-stage-client-starting-client = [{ -client }]: Preparing Client...
 hud-init-stage-render-pipeline = Creating render pipeline ({ $done }/{ $total })
 
 hud-tutorial-disable = Permanently disable tutorial hints
+
+# Phone touch buttons
+hud-touch-move = Move
+hud-touch-alt = Alt
+hud-touch-menu = Menu

@@ -1550,11 +1550,16 @@ impl Hud {
         self.current_dialogue.as_ref().map(|(e, _, _)| *e)
     }
 
-    #[expect(clippy::single_match)] // TODO: Pending review in #587
     /// Touch buttons on screen this frame, for hit-testing taps.
     #[cfg(target_os = "android")]
     pub fn touch_regions(&self) -> &[touch_buttons::Region] { &self.touch_regions }
 
+    /// Shows or hides the secondary touch buttons. Shared with the action bar's
+    /// "More" button.
+    #[cfg(target_os = "android")]
+    pub fn toggle_touch_more(&mut self) { self.action_bar_expanded = !self.action_bar_expanded; }
+
+    #[expect(clippy::single_match)] // TODO: Pending review in #587
     fn update_layout(
         &mut self,
         client: &Client,
@@ -1644,7 +1649,9 @@ impl Hud {
                         dancing: char_state.is_some_and(|cs| matches!(cs, comp::CharacterState::Dance)),
                         zoom_locked: global_state.settings.gameplay.zoom_lock,
                     };
-                    let shown = touch_buttons::shown(&ctx, |key| i18n.get_msg(key).into_owned());
+                    let shown = touch_buttons::shown(&ctx, self.action_bar_expanded, |key| {
+                        i18n.get_msg(key).into_owned()
+                    });
                     self.touch_regions = touch_buttons::regions(&shown);
 
                     if self.ids.android_touch_controls.len() < touch_buttons::COUNT * 2 {
@@ -1661,12 +1668,11 @@ impl Hud {
                             (0.5 - button.center.y as f64) * ui_widgets.win_h,
                         );
                         let size = ui_widgets.win_h * button.diameter as f64;
-                        let backdrop = match (button.enabled, button.active) {
-                            (false, _) => (0.04, 0.07, 0.09, 0.15),
-                            (true, true) => (0.20, 0.45, 0.25, 0.55),
-                            (true, false) => (0.04, 0.07, 0.09, 0.38),
+                        let backdrop = if button.active {
+                            (0.20, 0.45, 0.25, 0.55)
+                        } else {
+                            (0.04, 0.07, 0.09, 0.38)
                         };
-                        let text_alpha = if button.enabled { 0.8 } else { 0.3 };
                         Rectangle::fill([size, size])
                             .rgba(backdrop.0, backdrop.1, backdrop.2, backdrop.3)
                             .x_y(center.x, center.y)
@@ -1674,7 +1680,7 @@ impl Hud {
                         Text::new(&button.label)
                             .font_id(self.fonts.cyri.conrod_id)
                             .font_size(self.fonts.cyri.scale(18))
-                            .color(Color::Rgba(1.0, 1.0, 1.0, text_alpha))
+                            .color(Color::Rgba(1.0, 1.0, 1.0, 0.8))
                             .x_y(center.x, center.y)
                             .set(
                                 self.ids.android_touch_controls[button.index + label_offset],

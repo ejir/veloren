@@ -120,3 +120,8 @@ hud-action-sheathe = 收起武器
 hud-action-draw = 拔出武器
 hud-action-more = 更多
 hud-action-less = 收起
+
+# 手机触摸按钮
+hud-touch-move = 移动
+hud-touch-alt = 特殊攻击
+hud-touch-menu = 菜单
