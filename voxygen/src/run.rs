@@ -114,6 +114,17 @@ pub fn run(
                 span!(_guard, "Handle DeviceEvent");
                 global_state.window.handle_device_event(event)
             },
+            // On Android the native window is destroyed when the app is backgrounded
+            // (Suspended) and created again when it comes back (Resumed). The render
+            // surface must be rebuilt for the new window, or the screen stays black.
+            #[cfg(target_os = "android")]
+            winit::event::Event::Resumed => {
+                global_state.window.handle_resumed();
+            },
+            #[cfg(target_os = "android")]
+            winit::event::Event::Suspended => {
+                tracing::info!("Window suspended, waiting for resume to rebuild the surface");
+            },
             winit::event::Event::LoopExiting => {
                 // Save any unsaved changes to settings and profile
                 global_state

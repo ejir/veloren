@@ -138,6 +138,9 @@ pub struct Renderer {
     queue: wgpu::Queue,
     surface: wgpu::Surface<'static>,
     surface_config: wgpu::SurfaceConfiguration,
+    // Kept so the surface can be recreated after the native window is replaced
+    // (see `recreate_surface`).
+    instance: wgpu::Instance,
 
     sampler: wgpu::Sampler,
     depth_sampler: wgpu::Sampler,
@@ -626,6 +629,7 @@ impl Renderer {
             queue,
             surface,
             surface_config,
+            instance,
 
             state,
             recreation_pending: None,
@@ -771,6 +775,27 @@ impl Renderer {
             .iter()
             .for_each(|child| recursive_collect(&mut vec, child, 0));
         vec
+    }
+
+    /// Recreate the swapchain surface for `window`.
+    ///
+    /// On Android the native window is destroyed when the app is suspended
+    /// (backgrounded) and a new one is created on resume. The surface created
+    /// at startup refers to the old window, so after a resume it never yields
+    /// a frame and the screen stays black. Call this when the window is
+    /// available again.
+    pub fn recreate_surface(&mut self, window: Arc<winit::window::Window>) {
+        let dims = window.inner_size();
+        match self.instance.create_surface(window) {
+            Ok(surface) => self.surface = surface,
+            Err(err) => {
+                error!(?err, "Failed to recreate the surface after resume");
+                return;
+            },
+        }
+        // Configures the new surface with the current size and rebuilds the
+        // render targets that depend on it.
+        self.on_resize(Vec2::new(dims.width, dims.height));
     }
 
     /// Resize internal render targets to match window render target dimensions.
