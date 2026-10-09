@@ -140,7 +140,7 @@ fn state_of(ctx: &Context, input: GameInput) -> (bool, bool) {
         GameInput::Dance => (ctx.dancing, still),
         GameInput::Greet => (false, still),
         // Zooming does nothing while the zoom is locked, so hide it then.
-        GameInput::ZoomIn | GameInput::ZoomOut => (false, !ctx.zoom_locked),
+        GameInput::ZoomIn | GameInput::ZoomOut => (false, ready && !ctx.zoom_locked),
         GameInput::ZoomLock => (ctx.zoom_locked, ready),
         _ => (false, false),
     }
@@ -667,6 +667,8 @@ mod tests {
             .iter()
             .any(|region| matches!(region.action, Kind::Input(GameInput::Respawn)));
         assert!(tappable, "the respawn button has no region to tap");
+        // Nothing that needs a living character is offered alongside it.
+        assert_eq!(drawn.len(), 1 + FIXED.len() + 1, "dead but not quiet");
     }
 
     #[test]
