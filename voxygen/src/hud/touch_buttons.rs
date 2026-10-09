@@ -20,9 +20,10 @@
 //!   first [`TIER_SLOTS`] of them are offered, in a column beside the combat
 //!   cluster. Opening "More" swaps that column for a grid with room for every
 //!   context action, so the screen never carries two piles of them at once.
-//! - The grid is measured out from the space actually left between the movement
-//!   stick and the combat cluster ([`panel_geometry`]), so it fits narrow
-//!   screens instead of running into either.
+//! - The grid is measured out from the space actually left between the
+//!   movement stick and the combat cluster ([`grid`]), so it fits narrow
+//!   screens instead of running into either: it drops columns and shrinks its
+//!   buttons rather than letting them touch.
 //!
 //! The tests at the bottom assert the invariants for every device shape we care
 //! about: nothing overlaps and nothing leaves the screen.
@@ -172,21 +173,33 @@ const MENU_LANES: [f32; 3] = [0.13, 0.245, 0.36];
 const STICK_X: f32 = 0.16;
 const STICK_Y: f32 = 0.73;
 
-/// Rows of the context grid, and how many columns it has.
-const PANEL_ROW_COUNT: usize = 4;
-const PANEL_ROWS: [f32; PANEL_ROW_COUNT] = [0.36, 0.52, 0.68, 0.84];
+/// Most columns the context grid uses, on a screen wide enough for them.
 const PANEL_COLS: usize = 3;
+/// Fewest columns it falls back to. A single column of twelve would not fit
+/// vertically either, so below this the buttons shrink instead.
+const PANEL_COLS_MIN: usize = 2;
 /// Keep-out between the grid and whatever is beside it.
 const PANEL_MARGIN: f32 = 0.02;
+/// Gap the grid keeps between its own buttons, as for the rest of the layout.
+const BUTTON_GAP: f32 = 0.03;
 /// Widest the grid is allowed to stretch on a very wide screen.
 const PANEL_SPACING_MAX: f32 = 0.30;
+/// Smallest a grid button shrinks to. Only reached in windows narrower than
+/// anything the Android build can be given.
+const PANEL_D_MIN: f32 = 0.06;
+/// First row of the grid, how far down it may reach, and the row pitch it
+/// prefers when there is room for it.
+const PANEL_ROW_TOP: f32 = 0.36;
+const PANEL_ROW_BOTTOM: f32 = 0.92;
+const PANEL_ROW_PITCH: f32 = 0.16;
 
 /// Context actions offered while "More" is closed, and where they sit.
 const TIER_SLOTS: usize = 3;
 const TIER_ROWS: [f32; TIER_SLOTS] = [ROW_LOW, ROW_MID, ROW_HIGH];
 
-/// Number of context actions; the array in [`layout`] must match.
-pub const CONTEXT_SLOTS: usize = PANEL_COLS * PANEL_ROW_COUNT;
+/// Number of context actions; the array in [`layout`] must match. The grid
+/// shapes itself around this, so it is not tied to a row count.
+pub const CONTEXT_SLOTS: usize = 12;
 
 /// The text on a button.
 #[derive(Clone, Copy)]
@@ -355,32 +368,80 @@ fn center_of(lane: f32, row: f32, aspect: f32) -> Vec2<f32> {
     Vec2::new(1.0 - lane / aspect.max(0.1), row)
 }
 
-/// Centre and column spacing of the context grid, in screen-height units
-/// measured from the left edge.
+/// The context grid as it fits on one screen, in screen-height units.
+#[derive(Clone, Copy, Debug)]
+struct Grid {
+    /// Centre of the grid, measured from the left edge.
+    center: f32,
+    columns: usize,
+    /// Distance between neighbouring column centres.
+    pitch: f32,
+    /// Distance between neighbouring row centres.
+    row_pitch: f32,
+    /// Button diameter, which shrinks on narrow screens so that nothing
+    /// touches.
+    diameter: f32,
+}
+
+/// Measures the context grid out of the space between the movement stick and
+/// the combat cluster.
 ///
-/// The grid is centred in whatever is left between the movement stick and the
-/// combat cluster, and its columns are pulled in until they fit.
-fn panel_geometry(aspect: f32) -> (f32, f32) {
+/// The grid takes as many columns as fit at the usual size and adds rows
+/// instead when the screen is too narrow for them, shrinking its buttons only
+/// as far as it has to. From a 4:3 tablet upwards that leaves the plain 3x4
+/// grid; on a squarer window it becomes 2x6 with slightly smaller buttons
+/// rather than a pile of touching ones.
+fn grid(aspect: f32) -> Grid {
     let stick = STICK_X * aspect + D_STICK / 2.0;
     let cluster = aspect - LANE_INNER - D_SMALL / 2.0;
-    let free = cluster - stick - 2.0 * PANEL_MARGIN;
-    let gaps = (PANEL_COLS - 1).max(1) as f32;
-    let spacing = ((free - D_SMALL) / gaps).clamp(D_SMALL, PANEL_SPACING_MAX);
-    ((stick + cluster) / 2.0, spacing)
+    let free = (cluster - stick - 2.0 * PANEL_MARGIN).max(0.0);
+    let columns = ((free + BUTTON_GAP) / (D_SMALL + BUTTON_GAP))
+        .floor()
+        .clamp(PANEL_COLS_MIN as f32, PANEL_COLS as f32) as usize;
+    let rows = CONTEXT_SLOTS.div_ceil(columns);
+    let row_pitch = (PANEL_ROW_BOTTOM - PANEL_ROW_TOP) / (rows - 1).max(1) as f32;
+    let row_pitch = row_pitch.min(PANEL_ROW_PITCH);
+    // Buttons give up size before they give up the gap, across and down.
+    let diameter = D_SMALL
+        .min((free - (columns - 1) as f32 * BUTTON_GAP) / columns as f32)
+        .min(row_pitch - BUTTON_GAP)
+        .max(PANEL_D_MIN);
+    let spread = (free - diameter) / (columns - 1) as f32;
+    Grid {
+        center: (stick + cluster) / 2.0,
+        columns,
+        pitch: spread.clamp(diameter + BUTTON_GAP, PANEL_SPACING_MAX),
+        row_pitch,
+        diameter,
+    }
+}
+
+/// Where one button goes: a lane, a row, and how big it is.
+struct Placement {
+    lane: f32,
+    row: f32,
+    diameter: f32,
 }
 
 /// Lane and row of a context action, or `None` if it is not offered right now.
-fn context_slot(slot: usize, expanded: bool, aspect: f32) -> Option<(f32, f32)> {
-    if expanded {
-        let (center, spacing) = panel_geometry(aspect);
-        let column = (slot % PANEL_COLS) as f32;
-        let row = *PANEL_ROWS.get(slot / PANEL_COLS)?;
-        // The grid is measured from the left, lanes from the right.
-        let from_left = center + (column - (PANEL_COLS - 1) as f32 / 2.0) * spacing;
-        Some((aspect - from_left, row))
-    } else {
-        Some((LANE_CONTEXT, *TIER_ROWS.get(slot)?))
+fn context_slot(slot: usize, expanded: bool, aspect: f32) -> Option<Placement> {
+    if !expanded {
+        return Some(Placement {
+            lane: LANE_CONTEXT,
+            row: *TIER_ROWS.get(slot)?,
+            diameter: D_SMALL,
+        });
     }
+    let grid = grid(aspect);
+    let column = slot % grid.columns;
+    let row = slot / grid.columns;
+    // The grid is measured from the left, lanes from the right.
+    let from_left = grid.center + (column as f32 - (grid.columns - 1) as f32 / 2.0) * grid.pitch;
+    Some(Placement {
+        lane: aspect - from_left,
+        row: PANEL_ROW_TOP + row as f32 * grid.row_pitch,
+        diameter: grid.diameter,
+    })
 }
 
 /// Returns the buttons to show for the current state.
@@ -420,14 +481,14 @@ pub fn shown(
         if !spec.enabled {
             continue;
         }
-        let Some((lane, row)) = context_slot(spec.slot, expanded, aspect) else {
+        let Some(placement) = context_slot(spec.slot, expanded, aspect) else {
             continue;
         };
         shown.push(Shown {
             index: 1 + FIXED.len() + spec.slot,
             action: Some(spec.kind),
-            center: center_of(lane, row, aspect),
-            diameter: D_SMALL,
+            center: center_of(placement.lane, placement.row, aspect),
+            diameter: placement.diameter,
             label: localize(spec.label_key),
             active: spec.active,
         });
@@ -453,9 +514,28 @@ pub fn regions(shown: &[Shown]) -> Vec<Region> {
 mod tests {
     use super::*;
 
-    /// Every shape the overlay has to work on, from a 4:3 tablet to a 21:9
-    /// phone.
-    const ASPECTS: [f32; 5] = [4.0 / 3.0, 3.0 / 2.0, 16.0 / 9.0, 19.5 / 9.0, 21.0 / 9.0];
+    /// Every shape the overlay has to work on. The Android activity is locked
+    /// to landscape, so a square multi-window pane is the narrowest the
+    /// overlay can be given; 21:9 is the widest phone in common use, and 3:1
+    /// stands in for a window dragged wide on a desktop.
+    const ASPECTS: [f32; 10] = [
+        1.0,
+        1.1,
+        1.2,
+        4.0 / 3.0,
+        3.0 / 2.0,
+        16.0 / 9.0,
+        2.0,
+        19.5 / 9.0,
+        21.0 / 9.0,
+        3.0,
+    ];
+
+    /// How close two touch targets may sit, in screen-height units. Anything
+    /// under this is a thumb trap even where the circles do not quite touch.
+    /// The layout keeps [`PANEL_MARGIN`] — a little more — at its tightest;
+    /// the difference is slack for the rounding in these positions.
+    const MIN_GAP: f32 = 0.015;
 
     /// A state where every action is available, so the layout is at its
     /// fullest.
@@ -492,11 +572,9 @@ mod tests {
                 for (i, &(index, x, y, radius)) in buttons.iter().enumerate() {
                     for &(other, x2, y2, radius2) in &buttons[i + 1..] {
                         let gap = ((x - x2).powi(2) + (y - y2).powi(2)).sqrt() - radius - radius2;
-                        let overlap = -gap;
                         assert!(
-                            gap > 0.0,
-                            "slots {index} and {other} overlap by {overlap:.4} of the screen \
-                             height at aspect {aspect:.2} (more: {expanded})",
+                            gap >= MIN_GAP,
+                            "slots {index}/{other} gap {gap:.4}h at {aspect:.2} open={expanded}",
                         );
                     }
                 }
