@@ -14,6 +14,7 @@ pub use winit::{Clipboard, window_event};
 use super::{
     graphic::{self, Graphic},
     scale::{Scale, ScaleMode},
+    touch_scroll::TouchScrollTracker,
 };
 use crate::{
     error::Error,
@@ -32,6 +33,8 @@ pub struct IcedUi {
     cache: Option<Cache>,
     events: Vec<Event>,
     cursor_position: Vec2<f32>,
+    // Turns finger drags into wheel scrolling (see the touch handling in `handle_event`)
+    touch_scroll: TouchScrollTracker<touch::Finger>,
     // Scaling of the ui
     scale: Scale,
     scale_changed: bool,
@@ -81,6 +84,7 @@ impl IcedUi {
             events: Vec::new(),
             // TODO: handle None
             cursor_position: Vec2::zero(),
+            touch_scroll: TouchScrollTracker::default(),
             scale,
             scale_changed: false,
         })
@@ -160,32 +164,70 @@ impl IcedUi {
             // Touchscreens don't emit cursor movement, so keep the tracked cursor
             // position in sync with touches: iced widgets (notably buttons)
             // hit-test against it. Scale positions like cursor movement events.
+            //
+            // iced's `Scrollable` only scrolls on touch when none of its children captured
+            // the press, but buttons capture every press. So a finger dragging a list made
+            // of buttons never scrolled it, and lifting the finger would also activate the
+            // button. Track swipes here, like the conrod UI does, and feed them to the
+            // scrollable as wheel motion. Taps below the drag threshold are passed through.
             Event::Touch(touch_event) => {
                 // TODO: return f32 here
                 let scale = self.scale.scale_factor_logical() as f32;
                 let scaled = |p: iced::Point| iced::Point::new(p.x / scale, p.y / scale);
-                let event = match touch_event {
+                let to_vec = |p: iced::Point| Vec2::new(p.x as f64, p.y as f64);
+                match touch_event {
                     touch::Event::FingerPressed { id, position } => {
                         let position = scaled(position);
                         self.cursor_position = Vec2::new(position.x, position.y);
-                        touch::Event::FingerPressed { id, position }
+                        self.touch_scroll.start(id, to_vec(position));
+                        self.events
+                            .push(Event::Touch(touch::Event::FingerPressed { id, position }));
                     },
                     touch::Event::FingerMoved { id, position } => {
                         let position = scaled(position);
                         self.cursor_position = Vec2::new(position.x, position.y);
-                        touch::Event::FingerMoved { id, position }
+                        match self.touch_scroll.move_to(id, to_vec(position)) {
+                            Some(delta) => {
+                                // Cancel any button press started by this finger, then scroll
+                                // the widget under it. The move itself is not forwarded, so the
+                                // scrollable's own touch handling does not scroll a second time.
+                                self.events
+                                    .push(Event::Touch(touch::Event::FingerLost { id, position }));
+                                self.events.push(Event::Mouse(mouse::Event::WheelScrolled {
+                                    delta: mouse::ScrollDelta::Pixels {
+                                        x: 0.0,
+                                        y: delta.y as f32,
+                                    },
+                                }));
+                            },
+                            None => {
+                                self.events.push(Event::Touch(touch::Event::FingerMoved {
+                                    id,
+                                    position,
+                                }));
+                            },
+                        }
                     },
                     touch::Event::FingerLifted { id, position } => {
                         let position = scaled(position);
                         self.cursor_position = Vec2::new(position.x, position.y);
-                        touch::Event::FingerLifted { id, position }
+                        // A release that ends a swipe must not activate the widget under the
+                        // finger, so report it as lost.
+                        let event = if self.touch_scroll.finish(id) {
+                            touch::Event::FingerLost { id, position }
+                        } else {
+                            touch::Event::FingerLifted { id, position }
+                        };
+                        self.events.push(Event::Touch(event));
                     },
-                    touch::Event::FingerLost { id, position } => touch::Event::FingerLost {
-                        id,
-                        position: scaled(position),
+                    touch::Event::FingerLost { id, position } => {
+                        self.touch_scroll.finish(id);
+                        self.events.push(Event::Touch(touch::Event::FingerLost {
+                            id,
+                            position: scaled(position),
+                        }));
                     },
-                };
-                self.events.push(Event::Touch(event));
+                }
             },
             event => self.events.push(event),
         }

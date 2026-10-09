@@ -474,6 +474,15 @@ impl Window {
 
     pub fn renderer_mut(&mut self) -> &mut Renderer { &mut self.renderer }
 
+    /// The platform made the native window available again (Android resume
+    /// after the app was backgrounded). The old surface is stale, so rebuild
+    /// it and refresh the UI sizes.
+    pub fn handle_resumed(&mut self) {
+        tracing::info!("Window resumed, recreating the render surface");
+        self.renderer.recreate_surface(Arc::clone(&self.window));
+        self.needs_refresh_resize = true;
+    }
+
     pub fn resolve_deduplicated_events(
         &mut self,
         settings: &mut Settings,

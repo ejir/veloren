@@ -96,91 +96,23 @@ enum AndroidTouchControl {
     Move { origin: Vec2<f32> },
     Look { last: Vec2<f32> },
     Button(GameInput),
+    /// The "More" button. Acts on press only and sends no input.
+    More,
 }
 
+/// Returns the touch button under `position`. The buttons come from the HUD,
+/// which draws them, so a tap always matches what is on screen.
 #[cfg(target_os = "android")]
-fn android_touch_button(position: Vec2<f32>, width: f32, height: f32) -> Option<GameInput> {
-    // Landscape touch layout for combat, movement, and interaction targets.
-    // The left half remains available for the movement stick and camera swipes.
-    // Positions must match the touch overlay drawn by the HUD.
-    let combat_radius = height * 0.075;
-    let menu_radius = height * 0.05;
-    let skill_radius = height * 0.05;
-    [
-        (
-            GameInput::Primary,
-            Vec2::new(width * 0.90, height * 0.78),
-            combat_radius,
-        ),
-        (
-            GameInput::Secondary,
-            Vec2::new(width * 0.76, height * 0.85),
-            combat_radius,
-        ),
-        (
-            GameInput::Jump,
-            Vec2::new(width * 0.76, height * 0.66),
-            combat_radius,
-        ),
-        (
-            GameInput::Interact,
-            Vec2::new(width * 0.90, height * 0.57),
-            combat_radius,
-        ),
-        (
-            GameInput::Roll,
-            Vec2::new(width * 0.76, height * 0.47),
-            combat_radius,
-        ),
-        (
-            GameInput::Inventory,
-            Vec2::new(width * 0.56, height * 0.075),
-            menu_radius,
-        ),
-        (
-            GameInput::Diary,
-            Vec2::new(width * 0.66, height * 0.075),
-            menu_radius,
-        ),
-        (
-            GameInput::Settings,
-            Vec2::new(width * 0.76, height * 0.075),
-            menu_radius,
-        ),
-        (
-            GameInput::Escape,
-            Vec2::new(width * 0.86, height * 0.075),
-            menu_radius,
-        ),
-        (
-            GameInput::Slot1,
-            Vec2::new(width * 0.50, height * 0.26),
-            skill_radius,
-        ),
-        (
-            GameInput::Slot2,
-            Vec2::new(width * 0.60, height * 0.26),
-            skill_radius,
-        ),
-        (
-            GameInput::Slot3,
-            Vec2::new(width * 0.70, height * 0.26),
-            skill_radius,
-        ),
-        (
-            GameInput::Slot4,
-            Vec2::new(width * 0.80, height * 0.26),
-            skill_radius,
-        ),
-        (
-            GameInput::Slot5,
-            Vec2::new(width * 0.90, height * 0.26),
-            skill_radius,
-        ),
-    ]
-    .into_iter()
-    .find_map(|(button, center, radius)| {
-        ((position - center).magnitude_squared() <= radius * radius).then_some(button)
+fn android_touch_button(
+    regions: &[crate::hud::touch_buttons::Region],
+    position: Vec2<f32>,
+    width: f32,
+    height: f32,
+) -> Option<crate::hud::touch_buttons::Kind> {
+    regions.iter().find_map(|region| {
+        let center = Vec2::new(region.center.x * width, region.center.y * height);
+        let radius = region.radius * height;
+        ((position - center).magnitude_squared() <= radius * radius).then_some(region.action)
     })
 }
 
@@ -324,7 +256,7 @@ impl SessionState {
                 AndroidTouchControl::Button(button) => global_state
                     .window
                     .send_event(Event::InputUpdate(button, false)),
-                AndroidTouchControl::Look { .. } => {},
+                AndroidTouchControl::More | AndroidTouchControl::Look { .. } => {},
             }
         }
     }
@@ -354,11 +286,22 @@ impl SessionState {
 
         match phase {
             TouchPhase::Started => {
-                let control = if let Some(button) = android_touch_button(position, width, height) {
-                    global_state
-                        .window
-                        .send_event(Event::InputUpdate(button, true));
-                    AndroidTouchControl::Button(button)
+                use crate::hud::touch_buttons::Kind;
+                let control = if let Some(action) =
+                    android_touch_button(self.hud.touch_regions(), position, width, height)
+                {
+                    match action {
+                        Kind::Input(button) => {
+                            global_state
+                                .window
+                                .send_event(Event::InputUpdate(button, true));
+                            AndroidTouchControl::Button(button)
+                        },
+                        Kind::More => {
+                            self.hud.toggle_touch_more();
+                            AndroidTouchControl::More
+                        },
+                    }
                 } else if position.x < width * 0.42 && position.y > height * 0.32 {
                     global_state
                         .window
@@ -405,7 +348,7 @@ impl SessionState {
                                 delta.y * sensitivity * invert_y,
                             )));
                         },
-                        AndroidTouchControl::Button(_) => {},
+                        AndroidTouchControl::Button(_) | AndroidTouchControl::More => {},
                     }
                 }
             },
@@ -423,7 +366,7 @@ impl SessionState {
                         AndroidTouchControl::Button(button) => global_state
                             .window
                             .send_event(Event::InputUpdate(button, false)),
-                        AndroidTouchControl::Look { .. } => {},
+                        AndroidTouchControl::More | AndroidTouchControl::Look { .. } => {},
                     }
                 }
             },
