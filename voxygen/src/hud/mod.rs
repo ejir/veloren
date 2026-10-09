@@ -23,7 +23,8 @@ mod slot_grid;
 mod slots;
 mod social;
 mod subtitles;
-#[cfg(target_os = "android")]
+// Built everywhere so the layout can be unit tested on CI; only drawn on phones.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub(crate) mod touch_buttons;
 mod trade;
 
@@ -1642,9 +1643,13 @@ impl Hud {
                             .is_some_and(|cs| matches!(cs, comp::CharacterState::Dance)),
                         zoom_locked: global_state.settings.gameplay.zoom_lock,
                     };
-                    let shown = touch_buttons::shown(&ctx, self.touch_more_expanded, |key| {
-                        i18n.get_msg(key).into_owned()
-                    });
+                    let aspect = (ui_widgets.win_w / ui_widgets.win_h.max(1.0)) as f32;
+                    let shown = touch_buttons::shown(
+                        &ctx,
+                        self.touch_more_expanded,
+                        aspect,
+                        |key| i18n.get_msg(key).into_owned(),
+                    );
                     self.touch_regions = touch_buttons::regions(&shown);
 
                     if self.ids.android_touch_controls.len() < touch_buttons::COUNT * 2 {
@@ -1670,9 +1675,12 @@ impl Hud {
                             .rgba(backdrop.0, backdrop.1, backdrop.2, backdrop.3)
                             .x_y(center.x, center.y)
                             .set(self.ids.android_touch_controls[button.index], ui_widgets);
+                        // The label follows the size of its button, so the small
+                        // menu buttons do not carry the text of the big ones.
+                        let font_size = (size * 0.16).clamp(12.0, 22.0) as u32;
                         Text::new(&button.label)
                             .font_id(self.fonts.cyri.conrod_id)
-                            .font_size(self.fonts.cyri.scale(18))
+                            .font_size(self.fonts.cyri.scale(font_size))
                             .color(Color::Rgba(1.0, 1.0, 1.0, 0.8))
                             .x_y(center.x, center.y)
                             .set(

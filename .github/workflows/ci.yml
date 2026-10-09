@@ -164,3 +164,58 @@ jobs:
             echo '```'
           } > /tmp/report.md
           gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/report.md
+
+  test:
+    name: Test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install system build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev \
+            libudev-dev \
+            mold \
+            pkg-config
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          toolchain="$(tr -d '\r\n' < rust-toolchain)"
+          rustup toolchain install "$toolchain" --profile minimal
+          rustup show active-toolchain
+
+      - name: Cache Rust build output
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-check
+
+      - name: Run the touch layout tests
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --locked -p veloren-voxygen --lib touch_buttons 2>&1 | tee /tmp/test.log
+      # TEMP-DEBUG: remove once CI is green (sandbox cannot fetch Actions logs)
+      - name: Post failure log to PR
+        if: failure() && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "## TEMP-DEBUG CI failure: ${{ github.job }} (run ${{ github.run_id }})"
+            echo ""
+            echo '```text'
+            tail -c 30000 /tmp/test.log
+            echo '```'
+          } > /tmp/report.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/report.md
