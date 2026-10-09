@@ -199,11 +199,11 @@ jobs:
         with:
           shared-key: ci-check
 
-      - name: Run the touch layout tests
+      - name: Run the UI layout tests
         shell: bash
         run: |
           set -o pipefail
-          cargo test --locked -p veloren-voxygen --lib touch_buttons 2>&1 | tee /tmp/test.log
+          cargo test --locked -p veloren-voxygen --lib -- touch_buttons char_selection 2>&1 | tee /tmp/test.log
       # TEMP-DEBUG: remove once CI is green (sandbox cannot fetch Actions logs)
       - name: Post failure log to PR
         if: failure() && github.event_name == 'pull_request'
