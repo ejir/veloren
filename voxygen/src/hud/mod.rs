@@ -23,7 +23,8 @@ mod slot_grid;
 mod slots;
 mod social;
 mod subtitles;
-// Built everywhere so the layout can be unit tested on CI; only drawn on phones.
+// Built everywhere so the layout can be unit tested on CI; only drawn on
+// phones.
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub(crate) mod touch_buttons;
 mod trade;
@@ -1644,12 +1645,10 @@ impl Hud {
                         zoom_locked: global_state.settings.gameplay.zoom_lock,
                     };
                     let aspect = (ui_widgets.win_w / ui_widgets.win_h.max(1.0)) as f32;
-                    let shown = touch_buttons::shown(
-                        &ctx,
-                        self.touch_more_expanded,
-                        aspect,
-                        |key| i18n.get_msg(key).into_owned(),
-                    );
+                    let shown =
+                        touch_buttons::shown(&ctx, self.touch_more_expanded, aspect, |key| {
+                            i18n.get_msg(key).into_owned()
+                        });
                     self.touch_regions = touch_buttons::regions(&shown);
 
                     if self.ids.android_touch_controls.len() < touch_buttons::COUNT * 2 {

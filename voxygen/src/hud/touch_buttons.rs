@@ -7,13 +7,14 @@
 //! # Layout
 //!
 //! Diameters and rows are fractions of the screen *height*, and the right-hand
-//! zones are lanes counted inwards from the right edge. One unit therefore means
-//! the same physical size on a 4:3 tablet and on a 21:9 phone. Callers pass the
-//! aspect ratio; [`Shown::center`] comes back as fractions of the screen, which
-//! is what the drawing code and the hit-testing already speak.
+//! zones are lanes counted inwards from the right edge. One unit therefore
+//! means the same physical size on a 4:3 tablet and on a 21:9 phone. Callers
+//! pass the aspect ratio; [`Shown::center`] comes back as fractions of the
+//! screen, which is what the drawing code and the hit-testing already speak.
 //!
-//! The screen is organised in rows (menus, skill slots, then the combat cluster)
-//! and lanes (edge, inner, context). Two rules keep it from getting crowded:
+//! The screen is organised in rows (menus, skill slots, then the combat
+//! cluster) and lanes (edge, inner, context). Two rules keep it from getting
+//! crowded:
 //!
 //! - The context actions form a single list. While "More" is closed, only the
 //!   first [`TIER_SLOTS`] of them are offered, in a column beside the combat
@@ -77,8 +78,8 @@ pub struct Spec {
 /// grid, so the actions that belong together share a row: combat, then the
 /// toggles and emotes, then the camera.
 ///
-/// Whether an action is offered at all comes from [`state_of`], which keeps this
-/// a plain list.
+/// Whether an action is offered at all comes from [`state_of`], which keeps
+/// this a plain list.
 const ACTIONS: [(GameInput, &'static str); CONTEXT_SLOTS] = [
     (GameInput::ToggleWield, "hud-touch-draw"),
     (GameInput::Block, "hud-touch-block"),
@@ -455,7 +456,8 @@ mod tests {
     /// phone.
     const ASPECTS: [f32; 5] = [4.0 / 3.0, 3.0 / 2.0, 16.0 / 9.0, 19.5 / 9.0, 21.0 / 9.0];
 
-    /// A state where every action is available, so the layout is at its fullest.
+    /// A state where every action is available, so the layout is at its
+    /// fullest.
     fn full_context() -> Context {
         Context {
             controlling: true,
@@ -489,9 +491,10 @@ mod tests {
                 for (i, &(index, x, y, radius)) in buttons.iter().enumerate() {
                     for &(other, x2, y2, radius2) in &buttons[i + 1..] {
                         let gap = ((x - x2).powi(2) + (y - y2).powi(2)).sqrt() - radius - radius2;
+                        let overlap = -gap;
                         assert!(
                             gap > 0.0,
-                            "slots {index} and {other} overlap by {-gap:.4} of the screen \
+                            "slots {index} and {other} overlap by {overlap:.4} of the screen \
                              height at aspect {aspect:.2} (more: {expanded})",
                         );
                     }
