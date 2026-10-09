@@ -129,7 +129,6 @@ hud-touch-roll = Roll
 hud-touch-interact = Interact
 hud-touch-inventory = Inventory
 hud-touch-diary = Diary
-hud-touch-settings = Settings
 hud-touch-draw = Draw
 hud-touch-sheathe = Sheathe
 hud-touch-glide = Glide

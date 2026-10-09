@@ -130,7 +130,6 @@ hud-touch-roll = 翻滚
 hud-touch-interact = 交互
 hud-touch-inventory = 物品栏
 hud-touch-diary = 技能书
-hud-touch-settings = 设置
 hud-touch-draw = 拔出武器
 hud-touch-sheathe = 收起武器
 hud-touch-glide = 滑翔
