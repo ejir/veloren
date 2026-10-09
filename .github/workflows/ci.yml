@@ -204,6 +204,11 @@ jobs:
         run: |
           set -o pipefail
           cargo test --locked -p veloren-voxygen --lib -- touch_buttons char_selection 2>&1 | tee /tmp/test.log
+          # Fail loudly if a filter ever stops matching: a run that executed no
+          # tests looks exactly like a passing one.
+          grep -q '^test hud::touch_buttons::tests::' /tmp/test.log
+          grep -q '^test menu::char_selection::ui::tests::' /tmp/test.log
+          grep -q '^test result: ok\.' /tmp/test.log
       # TEMP-DEBUG: remove once CI is green (sandbox cannot fetch Actions logs)
       - name: Post failure log to PR
         if: failure() && github.event_name == 'pull_request'
