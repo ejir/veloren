@@ -115,12 +115,33 @@ hud-pet = 摸摸
 hud-follow = 跟随
 hud-stay = 停留
 hud-read = 阅读
-hud-action-sheathe = 收起武器
-hud-action-draw = 拔出武器
-hud-action-more = 更多
-hud-action-less = 收起
 
 # 手机触摸按钮
+#
+# 这些条目与控制设置里的 `gameinput-*` 名称是分开的: 屏幕按钮需要简短的文字,
+# 而且按钮上写的是它所打开的窗口, 而不是触发它的按键。
 hud-touch-move = 移动
 hud-touch-alt = 特殊攻击
 hud-touch-menu = 菜单
+hud-touch-attack = 攻击
+hud-touch-block = 格挡
+hud-touch-jump = 跳跃
+hud-touch-roll = 翻滚
+hud-touch-interact = 交互
+hud-touch-inventory = 物品栏
+hud-touch-diary = 技能书
+hud-touch-draw = 拔出武器
+hud-touch-sheathe = 收起武器
+hud-touch-glide = 滑翔
+hud-touch-lantern = 提灯
+hud-touch-zoomin = 放大
+hud-touch-zoomout = 缩小
+hud-touch-zoomlock = 锁定缩放
+hud-touch-sneak = 潜行
+hud-touch-sit = 坐下
+hud-touch-crawl = 趴下
+hud-touch-dance = 跳舞
+hud-touch-greet = 打招呼
+hud-touch-respawn = 重生
+hud-touch-more = 更多
+hud-touch-less = 收起

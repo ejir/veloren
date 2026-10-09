@@ -78,3 +78,33 @@ hud-init-stage-client-authentication = { "[" }{ -client }]: 認證中...
 hud-init-stage-client-load-init-data = { "[" }{ -client }]: 從伺服器加載初始化資料中...
 hud-init-stage-client-starting-client = { "[" }{ -client }]: 準備客戶端中...
 hud-init-stage-render-pipeline = 正在建立渲染管線 ({ $done }/{ $total })
+
+# 手機觸控按鈕
+#
+# 這些條目與控制設定裡的 `gameinput-*` 名稱分開: 螢幕按鈕需要簡短的文字,
+# 而且按鈕上寫的是它打開的視窗, 而不是觸發它的按鍵。
+hud-touch-move = 移動
+hud-touch-alt = 特殊攻擊
+hud-touch-menu = 選單
+hud-touch-attack = 攻擊
+hud-touch-block = 防禦
+hud-touch-jump = 跳躍
+hud-touch-roll = 翻滾
+hud-touch-interact = 互動
+hud-touch-inventory = 背包
+hud-touch-diary = 日誌
+hud-touch-draw = 拔出武器
+hud-touch-sheathe = 收起武器
+hud-touch-glide = 滑翔
+hud-touch-lantern = 燈籠
+hud-touch-zoomin = 放大
+hud-touch-zoomout = 縮小
+hud-touch-zoomlock = 鎖定縮放
+hud-touch-sneak = 潛行
+hud-touch-sit = 坐下
+hud-touch-crawl = 趴下
+hud-touch-dance = 跳舞
+hud-touch-greet = 招呼
+hud-touch-respawn = 重生
+hud-touch-more = 更多
+hud-touch-less = 收起

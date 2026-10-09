@@ -57,6 +57,107 @@ const BANNER_ALPHA: u8 = 210;
 // Buttons in the bottom corners
 const SMALL_BUTTON_HEIGHT: u16 = 31;
 
+/// Width of the character panel on the left of the screen.
+const PANEL_WIDTH: u16 = 322;
+/// Height of the server name, in scaled pixels.
+const SERVER_TEXT_HEIGHT: u16 = 25;
+/// Width over height of `frames/selection.png` (186x47), which lays out the
+/// character entries and the create button.
+const SELECTION_RATIO: f32 = 186.0 / 47.0;
+/// The character list is the point of this screen, so the panel gives up
+/// decoration before it gives the list less than this.
+const MIN_LIST_HEIGHT: f32 = 140.0;
+
+/// How tall the fixed pieces of the character panel are, in scaled pixels.
+///
+/// A desktop window has room for all of them, but a phone in the landscape is
+/// 360-430 scaled pixels tall where a desktop window is around 900, and the
+/// list is the only flexible child in the column - it gets whatever is left.
+/// With the desktop sizes nothing was left, so on a phone the list could not be
+/// seen at all.
+struct PanelSizes {
+    /// Padding inside the server name bar.
+    server_padding: u16,
+    /// Space below the server name, inside its bar.
+    server_space: u16,
+    /// Gap between the pieces of the left column.
+    spacing: u16,
+    /// Height of the create button. The frame's own aspect ratio caps it at
+    /// `PANEL_WIDTH / SELECTION_RATIO` regardless.
+    create_button_height: u16,
+    /// Height of the strip below the create button, `None` to leave it out.
+    frame_bottom_height: Option<u16>,
+    /// Height of the rules, spectate and enter world buttons.
+    button_height: u16,
+    /// Padding around the whole screen.
+    screen_padding: u16,
+    /// Padding inside the row that holds the panel.
+    row_padding: u16,
+}
+
+impl PanelSizes {
+    /// The sizes this panel was designed with.
+    fn tall() -> Self {
+        Self {
+            server_padding: 12,
+            server_space: 25,
+            spacing: 10,
+            create_button_height: (f32::from(PANEL_WIDTH) / SELECTION_RATIO) as u16,
+            frame_bottom_height: Some(40),
+            button_height: 52,
+            screen_padding: 5,
+            row_padding: 15,
+        }
+    }
+
+    /// Everything the panel can do without, for windows too short for
+    /// [`Self::tall`].
+    fn compact() -> Self {
+        Self {
+            server_padding: 4,
+            server_space: 0,
+            spacing: 6,
+            // Still a comfortable touch target, less than two thirds of the
+            // height the frame's aspect ratio asks for.
+            create_button_height: 48,
+            frame_bottom_height: None,
+            button_height: 44,
+            screen_padding: 4,
+            row_padding: 6,
+        }
+    }
+
+    fn new(window_height: f32, has_rules: bool) -> Self {
+        let tall = Self::tall();
+        if window_height >= tall.fixed_height(has_rules) + MIN_LIST_HEIGHT {
+            tall
+        } else {
+            Self::compact()
+        }
+    }
+
+    /// How much of the window the fixed pieces take, which leaves the rest to
+    /// the character list. Mirrors the widget tree in [`Controls::view`].
+    fn fixed_height(&self, has_rules: bool) -> f32 {
+        // The server bar: its name, the space below it, and its padding.
+        let server = f32::from(SERVER_TEXT_HEIGHT + self.server_space + self.spacing)
+            + f32::from(self.server_padding) * 2.0;
+        // Server bar, the list column, and the rules button if there is one.
+        let pieces = 2 + u16::from(has_rules);
+        let gaps = f32::from(self.spacing) * f32::from(pieces - 1);
+        // The frame stops the button from growing past its own aspect ratio.
+        let create =
+            f32::from(self.create_button_height).min(f32::from(PANEL_WIDTH) / SELECTION_RATIO);
+        let frame = f32::from(self.frame_bottom_height.unwrap_or(0));
+        // The bottom row is as tall as its tallest button.
+        let bottom = f32::from(self.button_height.max(SMALL_BUTTON_HEIGHT));
+        let rules = if has_rules { self.button_height } else { 0 };
+        // The screen and the row inside it are padded on both sides.
+        let padding = f32::from(self.screen_padding + self.row_padding) * 2.0;
+        padding + gaps + server + create + frame + bottom + f32::from(rules)
+    }
+}
+
 const STARTER_HAMMER: &str = "common.items.weapons.hammer.starter_hammer";
 const STARTER_BOW: &str = "common.items.weapons.bow.starter";
 const STARTER_AXE: &str = "common.items.weapons.axe.starter_axe";
@@ -404,6 +505,7 @@ impl Controls {
         client: &Client,
         error: &Option<String>,
         i18n: &'a Localization,
+        window_height: f32,
     ) -> Element<'a, Message> {
         // TODO: use font scale thing for text size (use on button size for buttons with
         // text)
@@ -548,17 +650,23 @@ impl Controls {
                 #[cfg(not(feature = "singleplayer"))]
                 let server_name = &client.server_info().name;
 
+                // How much of the window the fixed pieces of this panel take, and
+                // so how much is left for the character list.
+                let sizes = PanelSizes::new(window_height, self.has_rules);
+
                 let server = Container::new(
                     Column::with_children(vec![
-                        Text::new(server_name).size(fonts.cyri.scale(25)).into(),
+                        Text::new(server_name)
+                            .size(fonts.cyri.scale(SERVER_TEXT_HEIGHT))
+                            .into(),
                         // TODO: show additional server info here
-                        Space::new(Length::Fill, Length::Units(25)).into(),
+                        Space::new(Length::Fill, Length::Units(sizes.server_space)).into(),
                     ])
-                    .spacing(5)
+                    .spacing(sizes.spacing)
                     .align_items(Align::Center),
                 )
                 .style(style::container::Style::color(Rgba::new(0, 0, 0, 217)))
-                .padding(12)
+                .padding(sizes.server_padding)
                 .center_x()
                 .center_y()
                 .width(Length::Fill);
@@ -713,7 +821,8 @@ impl Controls {
                     };
                     // Kept outside the scrollable list (see below) so it stays visible even
                     // when the list is long or the screen is short.
-                    let create_character_button: Element<'_, Message> = AspectRatioContainer::new({
+                    let create_character_button: Element<'_, Message> =
+                        AspectRatioContainer::new({
                             let button = Button::new(
                                 new_character_button,
                                 Container::new(Text::new(
@@ -743,13 +852,14 @@ impl Controls {
                             }
                         })
                         .ratio_of_image(imgs.char_selection)
+                        .max_height(u32::from(sizes.create_button_height))
                         .into();
                     (characters, create_character_button)
                 };
 
                 // TODO: could replace column with scrollable completely if it had a with
                 // children method
-                let characters = Column::with_children(vec![
+                let mut panel: Vec<Element<'_, Message>> = vec![
                     Container::new(
                         Scrollable::new(characters_scroll)
                             .push(Column::with_children(characters).spacing(4))
@@ -766,21 +876,27 @@ impl Controls {
                         0,
                         BANNER_ALPHA,
                     )))
-                    .width(Length::Units(322))
+                    .width(Length::Units(PANEL_WIDTH))
                     .height(Length::Fill)
                     .center_x()
                     .into(),
                     Container::new(create_character_button)
-                        .width(Length::Units(322))
+                        .width(Length::Units(PANEL_WIDTH))
                         .center_x()
                         .into(),
-                    Image::new(imgs.frame_bottom)
-                        .height(Length::Units(40))
-                        .width(Length::Units(322))
-                        .color(Rgba::from_translucent(0, BANNER_ALPHA))
-                        .into(),
-                ])
-                .height(Length::Fill);
+                ];
+                // The strip below the button is decoration, and a short window
+                // needs the room for the list.
+                if let Some(frame_height) = sizes.frame_bottom_height {
+                    panel.push(
+                        Image::new(imgs.frame_bottom)
+                            .height(Length::Units(frame_height))
+                            .width(Length::Units(PANEL_WIDTH))
+                            .color(Rgba::from_translucent(0, BANNER_ALPHA))
+                            .into(),
+                    );
+                }
+                let characters = Column::with_children(panel).height(Length::Fill);
 
                 let mut left_column_children = vec![server.into(), characters.into()];
 
@@ -796,13 +912,13 @@ impl Controls {
                         .align_y(Align::End)
                         .width(Length::Fill)
                         .center_x()
-                        .height(Length::Units(52))
+                        .height(Length::Units(sizes.button_height))
                         .into(),
                     );
                 }
                 let left_column = Column::with_children(left_column_children)
-                    .spacing(10)
-                    .width(Length::Units(322)) // TODO: see if we can get iced to work with settings below
+                    .spacing(sizes.spacing)
+                    .width(Length::Units(PANEL_WIDTH)) // TODO: see if we can get iced to work with settings below
                     // .max_width(360)
                     // .width(Length::Fill)
                     .height(Length::Fill);
@@ -811,7 +927,7 @@ impl Controls {
                     left_column.into(),
                     MouseDetector::new(&mut self.mouse_detector, Length::Fill, Length::Fill).into(),
                 ])
-                .padding(15)
+                .padding(sizes.row_padding)
                 .width(Length::Fill)
                 .height(Length::Fill);
                 let mut bottom_content = vec![
@@ -837,7 +953,7 @@ impl Controls {
                             Some(Message::Spectate),
                         ))
                         .width(Length::Fill)
-                        .height(Length::Units(52))
+                        .height(Length::Units(sizes.button_height))
                         .center_x()
                         .into(),
                     );
@@ -853,7 +969,7 @@ impl Controls {
                             selected.map(|_| Message::EnterWorld),
                         ))
                         .width(Length::Fill)
-                        .height(Length::Units(52))
+                        .height(Length::Units(sizes.button_height))
                         .center_x()
                         .into(),
                     );
@@ -865,7 +981,7 @@ impl Controls {
 
                 let content = Column::with_children(vec![top.into(), bottom.into()])
                     .width(Length::Fill)
-                    .padding(5)
+                    .padding(sizes.screen_padding)
                     .height(Length::Fill);
 
                 // Overlay delete prompt
@@ -2197,9 +2313,18 @@ impl CharSelectionUi {
         let mut events = Vec::new();
         let i18n = global_state.i18n.read();
 
+        // How the panel is sized depends on how much vertical room the window
+        // has, and on a phone that is far less than on a desktop.
+        let window_height = self.ui.scale().scaled_resolution().y as f32;
+
         let (mut messages, _) = self.ui.maintain(
-            self.controls
-                .view(&global_state.settings, client, &self.error, &i18n),
+            self.controls.view(
+                &global_state.settings,
+                client,
+                &self.error,
+                &i18n,
+                window_height,
+            ),
             global_state.window.renderer_mut(),
             None,
             &mut global_state.clipboard,
@@ -2241,4 +2366,66 @@ struct Sliders {
     beard: slider::State,
     height_scale: slider::State,
     starting_site: slider::State,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The window heights that matter, in scaled pixels: phones in the
+    /// landscape (a 1080p screen at a 3.0 scale factor leaves 360), tablets,
+    /// and the desktop windows the layout was designed for.
+    const WINDOW_HEIGHTS: [f32; 7] = [360.0, 393.0, 432.0, 540.0, 720.0, 900.0, 1080.0];
+
+    #[test]
+    fn the_character_list_is_never_squeezed_out() {
+        for has_rules in [false, true] {
+            for height in WINDOW_HEIGHTS {
+                let sizes = PanelSizes::new(height, has_rules);
+                let list = height - sizes.fixed_height(has_rules);
+                assert!(
+                    list >= MIN_LIST_HEIGHT,
+                    "the list only gets {list} of a {height} pixel window"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn short_windows_get_the_compact_panel() {
+        for has_rules in [false, true] {
+            for height in [360.0, 393.0, 432.0] {
+                let sizes = PanelSizes::new(height, has_rules);
+                assert_eq!(sizes.create_button_height, 48);
+                assert_eq!(sizes.frame_bottom_height, None);
+                // The compact panel has to fit in the smallest window a phone
+                // gives us, list included.
+                assert!(
+                    sizes.fixed_height(has_rules) + MIN_LIST_HEIGHT <= height,
+                    "the compact panel needs {} of a {height} pixel window",
+                    sizes.fixed_height(has_rules)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn desktops_keep_the_panel_they_are_used_to() {
+        let frame_height = (f32::from(PANEL_WIDTH) / SELECTION_RATIO) as u16;
+        for has_rules in [false, true] {
+            let sizes = PanelSizes::new(900.0, has_rules);
+            assert_eq!(sizes.create_button_height, frame_height);
+            assert_eq!(sizes.frame_bottom_height, Some(40));
+            assert_eq!(sizes.server_space, 25);
+        }
+    }
+
+    #[test]
+    fn the_compact_panel_gives_up_space_it_never_takes() {
+        for has_rules in [false, true] {
+            let tall = PanelSizes::tall().fixed_height(has_rules);
+            let compact = PanelSizes::compact().fixed_height(has_rules);
+            assert!(compact < tall, "compact {compact} vs tall {tall}");
+        }
+    }
 }

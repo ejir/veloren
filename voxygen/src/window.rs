@@ -264,6 +264,16 @@ pub struct Window {
     // saved to file, so initialized here
     pub gamelayer_mod1: bool,
     pub gamelayer_mod2: bool,
+    /// True between Android's `Suspended` and `Resumed`: the native window is
+    /// gone, so there is nothing to draw to and the surface must not be
+    /// touched. Only Android ever sets it, but the field is kept everywhere so
+    /// that CI compiles the code that reads it.
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
+    suspended: bool,
+    /// Set while the surface still has to be rebuilt for the window that came
+    /// back. It is cleared once that succeeds, which may take a few frames.
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
+    surface_dirty: bool,
 }
 
 impl Window {
@@ -463,6 +473,8 @@ impl Window {
             toggle_fullscreen: false,
             gamelayer_mod1: true,
             gamelayer_mod2: false,
+            suspended: false,
+            surface_dirty: false,
         };
 
         this.set_fullscreen_mode(settings.graphics.fullscreen);
@@ -474,13 +486,58 @@ impl Window {
 
     pub fn renderer_mut(&mut self) -> &mut Renderer { &mut self.renderer }
 
+    /// The platform took the native window away (Android backgrounding the
+    /// app). Everything that draws has to stop until it comes back.
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
+    pub fn handle_suspended(&mut self) {
+        tracing::info!("Window suspended, holding off drawing until it is back");
+        self.suspended = true;
+    }
+
     /// The platform made the native window available again (Android resume
-    /// after the app was backgrounded). The old surface is stale, so rebuild
-    /// it and refresh the UI sizes.
+    /// after the app was backgrounded). The old surface belongs to the window
+    /// that was destroyed, so it has to be rebuilt — but the new window may
+    /// have no size yet, so `refresh_surface` does that a few frames later.
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
     pub fn handle_resumed(&mut self) {
-        tracing::info!("Window resumed, recreating the render surface");
-        self.renderer.recreate_surface(Arc::clone(&self.window));
-        self.needs_refresh_resize = true;
+        if !self.suspended {
+            // The resume that comes with startup: the surface made in
+            // `Window::new` belongs to this window already.
+            return;
+        }
+        tracing::info!("Window resumed, rebuilding the render surface");
+        self.suspended = false;
+        self.surface_dirty = true;
+    }
+
+    /// Rebuilds the surface if a resume is still waiting for one. Called every
+    /// frame until it works, because the window may report no size at first.
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
+    pub fn refresh_surface(&mut self) {
+        if !self.surface_dirty {
+            return;
+        }
+        let size = self.window.inner_size();
+        if size.width == 0 || size.height == 0 {
+            tracing::debug!("Window has no size yet, waiting to rebuild the surface");
+            return;
+        }
+        if self.renderer.recreate_surface(Arc::clone(&self.window)) {
+            self.surface_dirty = false;
+            self.needs_refresh_resize = true;
+        }
+    }
+
+    /// Whether there is a surface to draw to right now.
+    pub fn ready_to_render(&self) -> bool {
+        #[cfg(target_os = "android")]
+        {
+            !self.suspended && !self.surface_dirty
+        }
+        #[cfg(not(target_os = "android"))]
+        {
+            true
+        }
     }
 
     pub fn resolve_deduplicated_events(

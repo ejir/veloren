@@ -14,6 +14,7 @@ char_selection-eye_color = 眼睛颜色
 char_selection-skin = 肤色
 char_selection-eyeshape = 眼睛形状
 char_selection-accessories = 配饰
+char_selection-height_scale = 身高
 char_selection-starting_site = 选择初始区域
 char_selection-starting_site_next = 下一个
 char_selection-starting_site_prev = 上一个

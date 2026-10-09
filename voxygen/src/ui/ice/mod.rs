@@ -201,10 +201,8 @@ impl IcedUi {
                                 }));
                             },
                             None => {
-                                self.events.push(Event::Touch(touch::Event::FingerMoved {
-                                    id,
-                                    position,
-                                }));
+                                self.events
+                                    .push(Event::Touch(touch::Event::FingerMoved { id, position }));
                             },
                         }
                     },
