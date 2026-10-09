@@ -58,6 +58,8 @@ pub struct Context {
     pub crawling: bool,
     pub dancing: bool,
     pub zoom_locked: bool,
+    /// The character has died, so respawning is the only thing left to do.
+    pub dead: bool,
 }
 
 /// Describes one context action before its text is localised.
@@ -121,7 +123,9 @@ pub fn layout(ctx: &Context) -> Vec<Spec> {
 
 /// Whether an action is lit up, and whether the current state offers it.
 fn state_of(ctx: &Context, input: GameInput) -> (bool, bool) {
-    let ready = ctx.controlling && !ctx.riding;
+    // Nothing can be done while dead but respawn, which has a button of its
+    // own, so the context actions stay out of the way.
+    let ready = ctx.controlling && !ctx.riding && !ctx.dead;
     let still = ready && !ctx.gliding;
     let glider = ctx.gliding || ctx.has_glider;
     let lantern = ctx.has_lantern || ctx.lantern_on;
@@ -200,6 +204,14 @@ const TIER_ROWS: [f32; TIER_SLOTS] = [ROW_LOW, ROW_MID, ROW_HIGH];
 /// Number of context actions; the array in [`layout`] must match. The grid
 /// shapes itself around this, so it is not tied to a row count.
 pub const CONTEXT_SLOTS: usize = 12;
+
+/// Buttons that exist in one state only. They come after the context actions so
+/// that every widget id stays where it is.
+const DEATH_SLOTS: usize = 1;
+/// Row of the respawn button, and where it sits across the screen. It belongs
+/// to neither cluster, so it is placed by width instead of by lane.
+const ROW_RESPAWN: f32 = 0.88;
+const X_RESPAWN: f32 = 0.5;
 
 /// The text on a button.
 #[derive(Clone, Copy)]
@@ -337,7 +349,7 @@ const FIXED: [Fixed; 14] = [
 ];
 
 /// Total number of button slots; used to size the widget ids.
-pub const COUNT: usize = 1 + FIXED.len() + CONTEXT_SLOTS;
+pub const COUNT: usize = 1 + FIXED.len() + CONTEXT_SLOTS + DEATH_SLOTS;
 
 /// A button to draw this frame, with its label already localised.
 pub struct Shown {
@@ -493,6 +505,18 @@ pub fn shown(
             active: spec.active,
         });
     }
+    if ctx.dead {
+        // Dying leaves nothing to do but respawn, and on a phone there is no
+        // key to press for it, so it gets a button of its own.
+        shown.push(Shown {
+            index: 1 + FIXED.len() + CONTEXT_SLOTS,
+            action: Some(Kind::Input(GameInput::Respawn)),
+            center: Vec2::new(X_RESPAWN, ROW_RESPAWN),
+            diameter: D_ATTACK,
+            label: localize("hud-touch-respawn"),
+            active: true,
+        });
+    }
     shown
 }
 
@@ -553,30 +577,54 @@ mod tests {
             crawling: true,
             dancing: true,
             zoom_locked: false,
+            dead: false,
         }
     }
 
+    /// The state the player is in after dying. Everything is left available on
+    /// purpose: the context actions have to stay out of the way of the respawn
+    /// button even in a state the HUD would never ask for.
+    fn dead_context() -> Context {
+        Context {
+            dead: true,
+            ..full_context()
+        }
+    }
+
+    /// Every state the overlay is drawn in.
+    fn contexts() -> [(&'static str, Context); 2] {
+        [("alive", full_context()), ("dead", dead_context())]
+    }
+
     /// Every button on screen, in screen-height units: `(index, x, y, radius)`.
-    fn placed(aspect: f32, expanded: bool) -> Vec<(usize, f32, f32, f32)> {
-        shown(&full_context(), expanded, aspect, str::to_owned)
+    fn placed(ctx: &Context, aspect: f32, expanded: bool) -> Vec<(usize, f32, f32, f32)> {
+        shown(ctx, expanded, aspect, str::to_owned)
             .into_iter()
             .map(|b| (b.index, b.center.x * aspect, b.center.y, b.diameter / 2.0))
             .collect()
     }
 
+    /// Fails if any two of these buttons come within [`MIN_GAP`] of each other.
+    fn assert_apart(buttons: &[(usize, f32, f32, f32)], state: &str) {
+        for (i, &(index, x, y, radius)) in buttons.iter().enumerate() {
+            for &(other, x2, y2, radius2) in &buttons[i + 1..] {
+                let gap = ((x - x2).powi(2) + (y - y2).powi(2)).sqrt() - radius - radius2;
+                assert!(
+                    gap >= MIN_GAP,
+                    "slots {index}/{other} gap {gap:.4}h in {state}",
+                );
+            }
+        }
+    }
+
     #[test]
     fn buttons_do_not_overlap() {
-        for aspect in ASPECTS {
-            for expanded in [false, true] {
-                let buttons = placed(aspect, expanded);
-                for (i, &(index, x, y, radius)) in buttons.iter().enumerate() {
-                    for &(other, x2, y2, radius2) in &buttons[i + 1..] {
-                        let gap = ((x - x2).powi(2) + (y - y2).powi(2)).sqrt() - radius - radius2;
-                        assert!(
-                            gap >= MIN_GAP,
-                            "slots {index}/{other} gap {gap:.4}h at {aspect:.2} open={expanded}",
-                        );
-                    }
+        for (name, ctx) in contexts() {
+            for aspect in ASPECTS {
+                for expanded in [false, true] {
+                    let buttons = placed(&ctx, aspect, expanded);
+                    let state = format!("{name} at {aspect:.2} open={expanded}");
+                    assert_apart(&buttons, &state);
                 }
             }
         }
@@ -584,20 +632,41 @@ mod tests {
 
     #[test]
     fn buttons_stay_on_screen() {
-        for aspect in ASPECTS {
-            for expanded in [false, true] {
-                for (index, x, y, radius) in placed(aspect, expanded) {
-                    assert!(
-                        x - radius >= 0.0 && x + radius <= aspect,
-                        "slot {index} leaves the screen sideways at aspect {aspect:.2}",
-                    );
-                    assert!(
-                        y - radius >= 0.0 && y + radius <= 1.0,
-                        "slot {index} leaves the screen vertically at aspect {aspect:.2}",
-                    );
+        for (name, ctx) in contexts() {
+            for aspect in ASPECTS {
+                for expanded in [false, true] {
+                    for (index, x, y, radius) in placed(&ctx, aspect, expanded) {
+                        assert!(
+                            x - radius >= 0.0 && x + radius <= aspect,
+                            "slot {index} off screen sideways in {name} at {aspect:.2}",
+                        );
+                        assert!(
+                            y - radius >= 0.0 && y + radius <= 1.0,
+                            "slot {index} off screen vertically in {name} at {aspect:.2}",
+                        );
+                    }
                 }
             }
         }
+    }
+
+    /// Dying on a phone has to leave a way back: there is no key to press.
+    #[test]
+    fn respawn_is_offered_only_when_dead() {
+        let respawns = |ctx: &Context| {
+            shown(ctx, false, 16.0 / 9.0, str::to_owned)
+                .iter()
+                .filter(|button| matches!(button.action, Some(Kind::Input(GameInput::Respawn))))
+                .count()
+        };
+        assert_eq!(respawns(&full_context()), 0);
+        assert_eq!(respawns(&dead_context()), 1);
+        // And it is tappable, not just drawn.
+        let drawn = shown(&dead_context(), false, 16.0 / 9.0, str::to_owned);
+        let tappable = regions(&drawn)
+            .iter()
+            .any(|region| matches!(region.action, Kind::Input(GameInput::Respawn)));
+        assert!(tappable, "the respawn button has no region to tap");
     }
 
     #[test]
@@ -620,7 +689,9 @@ mod tests {
         let contexts = |buttons: &[Shown]| {
             buttons
                 .iter()
-                .filter(|button| button.index > FIXED.len())
+                .filter(|button| {
+                    button.index > FIXED.len() && button.index <= FIXED.len() + CONTEXT_SLOTS
+                })
                 .count()
         };
         assert_eq!(contexts(&closed), TIER_SLOTS);

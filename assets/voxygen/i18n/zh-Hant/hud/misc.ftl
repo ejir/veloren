@@ -105,5 +105,6 @@ hud-touch-sit = 坐下
 hud-touch-crawl = 趴下
 hud-touch-dance = 跳舞
 hud-touch-greet = 招呼
+hud-touch-respawn = 重生
 hud-touch-more = 更多
 hud-touch-less = 收起

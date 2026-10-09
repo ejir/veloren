@@ -141,5 +141,6 @@ hud-touch-sit = Sit
 hud-touch-crawl = Crawl
 hud-touch-dance = Dance
 hud-touch-greet = Greet
+hud-touch-respawn = Respawn
 hud-touch-more = More
 hud-touch-less = Less

@@ -1643,6 +1643,9 @@ impl Hud {
                         dancing: char_state
                             .is_some_and(|cs| matches!(cs, comp::CharacterState::Dance)),
                         zoom_locked: global_state.settings.gameplay.zoom_lock,
+                        // Dying leaves nothing to do but respawn, and a phone
+                        // has no key for it, so it gets a button.
+                        dead: healths.get(me).is_some_and(|h| h.is_dead),
                     };
                     let aspect = (ui_widgets.win_w / ui_widgets.win_h.max(1.0)) as f32;
                     let shown =
