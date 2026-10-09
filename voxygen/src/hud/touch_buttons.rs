@@ -20,10 +20,10 @@
 //!   first [`TIER_SLOTS`] of them are offered, in a column beside the combat
 //!   cluster. Opening "More" swaps that column for a grid with room for every
 //!   context action, so the screen never carries two piles of them at once.
-//! - The grid is measured out from the space actually left between the
-//!   movement stick and the combat cluster ([`grid`]), so it fits narrow
-//!   screens instead of running into either: it drops columns and shrinks its
-//!   buttons rather than letting them touch.
+//! - The grid is measured out from the space actually left between the movement
+//!   stick and the combat cluster ([`grid`]), so it fits narrow screens instead
+//!   of running into either: it drops columns and shrinks its buttons rather
+//!   than letting them touch.
 //!
 //! The tests at the bottom assert the invariants for every device shape we care
 //! about: nothing overlaps and nothing leaves the screen.
@@ -515,9 +515,9 @@ mod tests {
     use super::*;
 
     /// Every shape the overlay has to work on. The Android activity is locked
-    /// to landscape, so a square multi-window pane is the narrowest the
-    /// overlay can be given; 21:9 is the widest phone in common use, and 3:1
-    /// stands in for a window dragged wide on a desktop.
+    /// to landscape, so a square multi-window pane is the narrowest the overlay
+    /// can be given; 21:9 is the widest phone in common use, and 3:1 stands in
+    /// for a window dragged wide on a desktop.
     const ASPECTS: [f32; 10] = [
         1.0,
         1.1,
@@ -533,8 +533,8 @@ mod tests {
 
     /// How close two touch targets may sit, in screen-height units. Anything
     /// under this is a thumb trap even where the circles do not quite touch.
-    /// The layout keeps [`PANEL_MARGIN`] — a little more — at its tightest;
-    /// the difference is slack for the rounding in these positions.
+    /// The layout keeps [`PANEL_MARGIN`] — a little more — at its tightest; the
+    /// difference is slack for the rounding in these positions.
     const MIN_GAP: f32 = 0.015;
 
     /// A state where every action is available, so the layout is at its
