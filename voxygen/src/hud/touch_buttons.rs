@@ -136,6 +136,7 @@ fn state_of(ctx: &Context, input: GameInput) -> (bool, bool) {
         GameInput::Greet => (false, still),
         // Zooming does nothing while the zoom is locked, so hide it then.
         GameInput::ZoomIn | GameInput::ZoomOut => (false, !ctx.zoom_locked),
+        GameInput::ZoomLock => (ctx.zoom_locked, ready),
         _ => (false, false),
     }
 }
