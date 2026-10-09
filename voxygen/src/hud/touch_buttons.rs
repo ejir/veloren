@@ -80,7 +80,7 @@ pub struct Spec {
 ///
 /// Whether an action is offered at all comes from [`state_of`], which keeps
 /// this a plain list.
-const ACTIONS: [(GameInput, &'static str); CONTEXT_SLOTS] = [
+const ACTIONS: [(GameInput, &str); CONTEXT_SLOTS] = [
     (GameInput::ToggleWield, "hud-touch-draw"),
     (GameInput::Block, "hud-touch-block"),
     (GameInput::Glide, "hud-touch-glide"),
@@ -541,7 +541,7 @@ mod tests {
         let contexts = |buttons: &[Shown]| {
             buttons
                 .iter()
-                .filter(|button| button.index >= 1 + FIXED.len())
+                .filter(|button| button.index > FIXED.len())
                 .count()
         };
         assert_eq!(contexts(&closed), TIER_SLOTS);
