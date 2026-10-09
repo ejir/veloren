@@ -1,5 +1,8 @@
 hud-bag-inventory = { $playername } 的物品栏
 hud-bag-stats_title = { $playername } 的状态
+hud-bag-quest-items-tab = 任务物品
+hud-bag-ingredients-tab = 材料
+hud-bag-gear-tab = 装备
 hud-bag-armor = 护甲
 hud-bag-stats = 状态
 hud-bag-head = 头部
@@ -35,6 +38,7 @@ hud-bag-protection_desc = 可以装备护甲来减少伤害。
 hud-bag-stun_res_desc =
     抵御被连续击打而晕眩的韧性.
     像耐力一样恢复.
+hud-bag-toggle-expanded-window = 切换扩展窗口
 hud-bag-sort_by_name = 根据名称排序
 hud-bag-sort_by_quality = 根据品质排序
 hud-bag-sort_by_category = 根据类别排序
@@ -66,3 +70,6 @@ hud-bag-split_swap_slots_drop_items =
         [1] 这将导致 1 件物品掉落在地上。你确定吗？
        *[other] 这将导致 { $slot_deficit } 件物品掉落在地上。你确定吗？
     }
+hud-context-menu-cancel = 取消
+hud-context-menu-drop = 丢弃
+hud-context-menu-use = 使用

@@ -82,6 +82,7 @@ main-server-rules-seen-before = 这些规则自你上次确认后已更新。
 main-credits = 鸣谢
 main-credits-created_by = 创建了
 main-credits-music = 音乐
+main-credits-sound = 音效
 main-credits-fonts = 字体
 main-credits-other_art = 其他艺术
 main-credits-contributors = 贡献者

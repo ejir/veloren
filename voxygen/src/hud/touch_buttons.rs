@@ -74,71 +74,71 @@ pub fn layout(ctx: &Context, expanded: bool) -> (Vec<Spec>, Vec<Spec>) {
 
     if ctx.controlling && !ctx.riding {
         if ctx.gliding {
-            primary.push(Spec::input(GameInput::Glide, "gameinput-glide", true, true));
+            primary.push(Spec::input(GameInput::Glide, "hud-touch-glide", true, true));
         } else {
             primary.push(Spec::input(
                 GameInput::ToggleWield,
                 if ctx.wielding {
-                    "hud-action-sheathe"
+                    "hud-touch-sheathe"
                 } else {
-                    "hud-action-draw"
+                    "hud-touch-draw"
                 },
                 ctx.wielding,
                 true,
             ));
             if ctx.wielding {
-                primary.push(Spec::input(GameInput::Block, "gameinput-block", false, true));
+                primary.push(Spec::input(GameInput::Block, "hud-touch-block", false, true));
             }
-            primary.push(Spec::input(GameInput::Roll, "gameinput-roll", false, true));
-            primary.push(Spec::input(GameInput::Jump, "gameinput-jump", false, true));
+            primary.push(Spec::input(GameInput::Roll, "hud-touch-roll", false, true));
+            primary.push(Spec::input(GameInput::Jump, "hud-touch-jump", false, true));
             primary.push(Spec::input(
                 GameInput::Glide,
-                "gameinput-glide",
+                "hud-touch-glide",
                 false,
                 ctx.has_glider,
             ));
         }
         primary.push(Spec::input(
             GameInput::ToggleLantern,
-            "gameinput-togglelantern",
+            "hud-touch-lantern",
             ctx.lantern_on,
             ctx.has_lantern || ctx.lantern_on,
         ));
     }
 
-    primary.push(Spec::input(GameInput::ZoomIn, "gameinput-zoomin", false, true));
-    primary.push(Spec::input(GameInput::ZoomOut, "gameinput-zoomout", false, true));
+    primary.push(Spec::input(GameInput::ZoomIn, "hud-touch-zoomin", false, true));
+    primary.push(Spec::input(GameInput::ZoomOut, "hud-touch-zoomout", false, true));
 
     if ctx.controlling && !ctx.riding && !ctx.gliding {
         secondary.push(Spec::input(
             GameInput::Sneak,
-            "gameinput-sneak",
+            "hud-touch-sneak",
             ctx.sneaking,
             true,
         ));
-        secondary.push(Spec::input(GameInput::Sit, "gameinput-sit", ctx.sitting, true));
+        secondary.push(Spec::input(GameInput::Sit, "hud-touch-sit", ctx.sitting, true));
         secondary.push(Spec::input(
             GameInput::Crawl,
-            "gameinput-crawl",
+            "hud-touch-crawl",
             ctx.crawling,
             true,
         ));
         secondary.push(Spec::input(
             GameInput::Dance,
-            "gameinput-dance",
+            "hud-touch-dance",
             ctx.dancing,
             true,
         ));
         secondary.push(Spec::input(
             GameInput::Greet,
-            "gameinput-greet",
+            "hud-touch-greet",
             false,
             true,
         ));
     }
     secondary.push(Spec::input(
         GameInput::ZoomLock,
-        "gameinput-zoomlock",
+        "hud-touch-zoomlock",
         ctx.zoom_locked,
         true,
     ));
@@ -146,9 +146,9 @@ pub fn layout(ctx: &Context, expanded: bool) -> (Vec<Spec>, Vec<Spec>) {
     primary.push(Spec {
         kind: Kind::More,
         label_key: if expanded {
-            "hud-action-less"
+            "hud-touch-less"
         } else {
-            "hud-action-more"
+            "hud-touch-more"
         },
         active: expanded,
         enabled: true,
@@ -179,7 +179,7 @@ const FIXED: [(Option<Kind>, Label, f32, f32, f32); 15] = [
     (None, Label::Key("hud-touch-move"), 0.20, 0.76, 0.34),
     (
         Some(Kind::Input(GameInput::Primary)),
-        Label::Key("gameinput-primary"),
+        Label::Key("hud-touch-attack"),
         0.90,
         0.78,
         0.15,
@@ -193,21 +193,21 @@ const FIXED: [(Option<Kind>, Label, f32, f32, f32); 15] = [
     ),
     (
         Some(Kind::Input(GameInput::Jump)),
-        Label::Key("gameinput-jump"),
+        Label::Key("hud-touch-jump"),
         0.76,
         0.66,
         0.15,
     ),
     (
         Some(Kind::Input(GameInput::Interact)),
-        Label::Key("gameinput-interact"),
+        Label::Key("hud-touch-interact"),
         0.90,
         0.57,
         0.15,
     ),
     (
         Some(Kind::Input(GameInput::Roll)),
-        Label::Key("gameinput-roll"),
+        Label::Key("hud-touch-roll"),
         0.76,
         0.47,
         0.15,
@@ -249,21 +249,21 @@ const FIXED: [(Option<Kind>, Label, f32, f32, f32); 15] = [
     ),
     (
         Some(Kind::Input(GameInput::Inventory)),
-        Label::Key("gameinput-inventory"),
+        Label::Key("hud-touch-inventory"),
         0.56,
         0.075,
         0.09,
     ),
     (
         Some(Kind::Input(GameInput::Diary)),
-        Label::Key("gameinput-diary"),
+        Label::Key("hud-touch-diary"),
         0.66,
         0.075,
         0.09,
     ),
     (
         Some(Kind::Input(GameInput::Settings)),
-        Label::Key("gameinput-settings"),
+        Label::Key("hud-touch-settings"),
         0.76,
         0.075,
         0.09,
