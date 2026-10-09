@@ -783,19 +783,26 @@ impl Renderer {
     /// (backgrounded) and a new one is created on resume. The surface created
     /// at startup refers to the old window, so after a resume it never yields
     /// a frame and the screen stays black. Call this when the window is
-    /// available again.
-    pub fn recreate_surface(&mut self, window: Arc<winit::window::Window>) {
+    /// available again and has a size; returns whether it worked, so that the
+    /// caller can try again on a later frame if it did not.
+    pub fn recreate_surface(&mut self, window: Arc<winit::window::Window>) -> bool {
         let dims = window.inner_size();
+        if dims.width == 0 || dims.height == 0 {
+            warn!("Window has no size, keeping the old surface for now");
+            return false;
+        }
         match self.instance.create_surface(window) {
             Ok(surface) => self.surface = surface,
             Err(err) => {
                 error!(?err, "Failed to recreate the surface after resume");
-                return;
+                return false;
             },
         }
         // Configures the new surface with the current size and rebuilds the
         // render targets that depend on it.
         self.on_resize(Vec2::new(dims.width, dims.height));
+        info!("Render surface rebuilt for the new window at {dims:?}");
+        true
     }
 
     /// Resize internal render targets to match window render target dimensions.
@@ -1338,6 +1345,16 @@ impl Renderer {
                 return Ok(None);
             },
             Err(err @ (wgpu::SurfaceError::OutOfMemory | wgpu::SurfaceError::Other)) => {
+                // Android takes the window away when the app is backgrounded,
+                // and the caller turns this into a panic. Losing a frame is
+                // the better trade there: the alternative is the sound going
+                // on behind a frozen screen.
+                #[cfg(target_os = "android")]
+                {
+                    warn!(?err, "Skipping a frame after a render surface error");
+                    return Ok(None);
+                }
+                #[cfg(not(target_os = "android"))]
                 return Err(err.into());
             },
         };

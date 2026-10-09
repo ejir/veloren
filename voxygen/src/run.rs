@@ -117,13 +117,11 @@ pub fn run(
             // On Android the native window is destroyed when the app is backgrounded
             // (Suspended) and created again when it comes back (Resumed). The render
             // surface must be rebuilt for the new window, or the screen stays black.
-            #[cfg(target_os = "android")]
             winit::event::Event::Resumed => {
                 global_state.window.handle_resumed();
             },
-            #[cfg(target_os = "android")]
             winit::event::Event::Suspended => {
-                tracing::info!("Window suspended, waiting for resume to rebuild the surface");
+                global_state.window.handle_suspended();
             },
             winit::event::Event::LoopExiting => {
                 // Save any unsaved changes to settings and profile
@@ -225,7 +223,17 @@ fn handle_main_events_cleared(
     #[cfg(feature = "egui-ui")]
     let scale_factor = global_state.window.scale_factor() as f32;
 
-    if let Some(last) = states.last_mut() {
+    // On Android there is no window to draw to while the app is backgrounded,
+    // and drawing anyway loses the surface: the game would keep running and
+    // playing sound behind a black screen. Everything but drawing carries on,
+    // and drawing starts again once the surface has been rebuilt for the
+    // window that came back.
+    let can_render = global_state.window.ready_to_render();
+    if !can_render {
+        global_state.window.refresh_surface();
+    }
+
+    if can_render && let Some(last) = states.last_mut() {
         capped_fps = last.capped_fps();
 
         span!(guard, "Render");
