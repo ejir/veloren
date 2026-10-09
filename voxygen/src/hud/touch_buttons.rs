@@ -87,7 +87,12 @@ pub fn layout(ctx: &Context, expanded: bool) -> (Vec<Spec>, Vec<Spec>) {
                 true,
             ));
             if ctx.wielding {
-                primary.push(Spec::input(GameInput::Block, "hud-touch-block", false, true));
+                primary.push(Spec::input(
+                    GameInput::Block,
+                    "hud-touch-block",
+                    false,
+                    true,
+                ));
             }
             primary.push(Spec::input(GameInput::Roll, "hud-touch-roll", false, true));
             primary.push(Spec::input(GameInput::Jump, "hud-touch-jump", false, true));
@@ -106,8 +111,18 @@ pub fn layout(ctx: &Context, expanded: bool) -> (Vec<Spec>, Vec<Spec>) {
         ));
     }
 
-    primary.push(Spec::input(GameInput::ZoomIn, "hud-touch-zoomin", false, true));
-    primary.push(Spec::input(GameInput::ZoomOut, "hud-touch-zoomout", false, true));
+    primary.push(Spec::input(
+        GameInput::ZoomIn,
+        "hud-touch-zoomin",
+        false,
+        true,
+    ));
+    primary.push(Spec::input(
+        GameInput::ZoomOut,
+        "hud-touch-zoomout",
+        false,
+        true,
+    ));
 
     if ctx.controlling && !ctx.riding && !ctx.gliding {
         secondary.push(Spec::input(
@@ -116,7 +131,12 @@ pub fn layout(ctx: &Context, expanded: bool) -> (Vec<Spec>, Vec<Spec>) {
             ctx.sneaking,
             true,
         ));
-        secondary.push(Spec::input(GameInput::Sit, "hud-touch-sit", ctx.sitting, true));
+        secondary.push(Spec::input(
+            GameInput::Sit,
+            "hud-touch-sit",
+            ctx.sitting,
+            true,
+        ));
         secondary.push(Spec::input(
             GameInput::Crawl,
             "hud-touch-crawl",

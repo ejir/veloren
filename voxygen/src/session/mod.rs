@@ -93,8 +93,12 @@ enum TickAction {
 #[cfg(target_os = "android")]
 #[derive(Clone, Copy)]
 enum AndroidTouchControl {
-    Move { origin: Vec2<f32> },
-    Look { last: Vec2<f32> },
+    Move {
+        origin: Vec2<f32>,
+    },
+    Look {
+        last: Vec2<f32>,
+    },
     Button(GameInput),
     /// The "More" button. Acts on press only and sends no input.
     More,

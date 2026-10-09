@@ -1,6 +1,4 @@
 #![expect(non_local_definitions)] // because of WidgetCommon derive
-#[cfg(target_os = "android")]
-pub(crate) mod touch_buttons;
 mod animation;
 mod bag;
 mod buffs;
@@ -25,6 +23,8 @@ mod slot_grid;
 mod slots;
 mod social;
 mod subtitles;
+#[cfg(target_os = "android")]
+pub(crate) mod touch_buttons;
 mod trade;
 
 pub mod controller_icons;
@@ -1393,7 +1393,8 @@ pub struct Hud {
     clear_chat: bool,
     current_dialogue: Option<(EcsEntity, Instant, rtsim::Dialogue<true>)>,
     extra_markers: Vec<map::ExtraMarker>,
-    /// Touch buttons on screen this frame, used by the session to hit-test taps.
+    /// Touch buttons on screen this frame, used by the session to hit-test
+    /// taps.
     #[cfg(target_os = "android")]
     touch_regions: Vec<touch_buttons::Region>,
     /// Whether the phone's secondary touch buttons are shown ("More").
@@ -1625,15 +1626,20 @@ impl Hud {
                         riding: client.is_riding(),
                         wielding: client.is_wielding() == Some(true),
                         gliding: client.is_gliding(),
-                        has_glider: inventory
-                            .is_some_and(|inv| inv.equipped(comp::slot::EquipSlot::Glider).is_some()),
-                        has_lantern: inventory
-                            .is_some_and(|inv| inv.equipped(comp::slot::EquipSlot::Lantern).is_some()),
+                        has_glider: inventory.is_some_and(|inv| {
+                            inv.equipped(comp::slot::EquipSlot::Glider).is_some()
+                        }),
+                        has_lantern: inventory.is_some_and(|inv| {
+                            inv.equipped(comp::slot::EquipSlot::Lantern).is_some()
+                        }),
                         lantern_on: client.is_lantern_enabled(),
                         sneaking: char_state.is_some_and(|cs| cs.is_stealthy()),
-                        sitting: char_state.is_some_and(|cs| matches!(cs, comp::CharacterState::Sit)),
-                        crawling: char_state.is_some_and(|cs| matches!(cs, comp::CharacterState::Crawl)),
-                        dancing: char_state.is_some_and(|cs| matches!(cs, comp::CharacterState::Dance)),
+                        sitting: char_state
+                            .is_some_and(|cs| matches!(cs, comp::CharacterState::Sit)),
+                        crawling: char_state
+                            .is_some_and(|cs| matches!(cs, comp::CharacterState::Crawl)),
+                        dancing: char_state
+                            .is_some_and(|cs| matches!(cs, comp::CharacterState::Dance)),
                         zoom_locked: global_state.settings.gameplay.zoom_lock,
                     };
                     let shown = touch_buttons::shown(&ctx, self.touch_more_expanded, |key| {

@@ -713,7 +713,8 @@ impl Controls {
                     };
                     // Kept outside the scrollable list (see below) so it stays visible even
                     // when the list is long or the screen is short.
-                    let create_character_button: Element<'_, Message> = AspectRatioContainer::new({
+                    let create_character_button: Element<'_, Message> =
+                        AspectRatioContainer::new({
                             let button = Button::new(
                                 new_character_button,
                                 Container::new(Text::new(
