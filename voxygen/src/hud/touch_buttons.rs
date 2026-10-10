@@ -231,8 +231,9 @@ const PANEL_SPACING_MAX: f32 = 0.30;
 const PANEL_D_MIN: f32 = 0.06;
 /// First row of the grid, how far down it may reach, and the row pitch it
 /// prefers when there is room for it.
-const PANEL_ROW_TOP: f32 = 0.36;
-const PANEL_ROW_BOTTOM: f32 = 0.92;
+const PANEL_ROW_TOP: f32 = 0.32;
+/// Leave a clear strip above the game's centered bottom hotbar.
+const PANEL_ROW_BOTTOM: f32 = 0.85;
 const PANEL_ROW_PITCH: f32 = 0.16;
 
 /// Context actions offered while "More" is closed, and where they sit.
@@ -895,6 +896,23 @@ mod tests {
                     let state = format!("{name} at {aspect:.2} open={expanded}");
                     assert_apart(&buttons, &state);
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn expanded_context_stays_clear_of_the_bottom_hotbar() {
+        const HOTBAR_CLEARANCE: f32 = 0.92;
+        for aspect in ASPECTS {
+            let buttons = shown(&full_context(), true, aspect, str::to_owned);
+            for button in buttons.iter().filter(|button| {
+                button.index > FIXED.len() && button.index <= FIXED.len() + CONTEXT_SLOTS
+            }) {
+                assert!(
+                    button.center.y + button.diameter / 2.0 <= HOTBAR_CLEARANCE,
+                    "context slot {} overlaps the bottom hotbar at aspect {aspect:.2}",
+                    button.index,
+                );
             }
         }
     }
