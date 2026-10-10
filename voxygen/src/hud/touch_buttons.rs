@@ -6,20 +6,21 @@
 //!
 //! # Layout
 //!
-//! Diameters and rows are fractions of the screen *height*, and the right-hand
-//! zones are lanes counted inwards from the right edge. One unit therefore
-//! means the same physical size on a 4:3 tablet and on a 21:9 phone. Callers
+//! Diameters and rows are fractions of the screen *height*. Left and right
+//! lanes are measured inwards from their respective edges, so one unit means
+//! the same physical size on a 4:3 tablet and on a 21:9 phone. Callers
 //! pass the aspect ratio; [`Shown::center`] comes back as fractions of the
 //! screen, which is what the drawing code and the hit-testing already speak.
 //!
 //! The screen is organised in rows (menus, skill slots, then the combat
-//! cluster) and lanes (edge, inner, context). Two rules keep it from getting
-//! crowded:
+//! cluster) and lanes (left, edge, inner, context). Menu and skill-slot lanes
+//! stay to the left of the default top-right minimap; combat lanes are counted
+//! in from the right. Two rules keep it from getting crowded:
 //!
 //! - The context actions form a single list. While "More" is closed, only the
-//!   first [`TIER_SLOTS`] of them are offered, in a column beside the combat
-//!   cluster. Opening "More" swaps that column for a grid with room for every
-//!   context action, so the screen never carries two piles of them at once.
+//!   first [`TIER_SLOTS`] enabled actions are offered in a column beside the
+//!   combat cluster. Opening "More" swaps that column for a grid with room for
+//!   every context action, so the screen never carries two piles of them at once.
 //! - The grid is measured out from the space actually left between the movement
 //!   stick and the combat cluster ([`grid`]), so it fits narrow screens instead
 //!   of running into either: it drops columns and shrinks its buttons rather
@@ -46,6 +47,16 @@ pub struct Context {
     /// The player has a living character that can take actions.
     pub controlling: bool,
     pub riding: bool,
+    /// A mountable entity or block is in interaction range.
+    pub has_mount_target: bool,
+    /// A tradeable entity is in interaction range.
+    pub has_trade_target: bool,
+    /// An owned pet can be told to stay or follow.
+    pub has_stay_follow_target: bool,
+    /// Whether the target pet is currently staying.
+    pub pet_staying: bool,
+    /// A trade is active; Glide and Sneak inputs are ignored then.
+    pub trading: bool,
     pub wielding: bool,
     pub gliding: bool,
     /// A glider is equipped, so gliding can start.
@@ -53,12 +64,16 @@ pub struct Context {
     /// A lantern is equipped, so the lantern can be turned on.
     pub has_lantern: bool,
     pub lantern_on: bool,
+    /// The scene around the player is dark enough to benefit from a lantern.
+    pub is_dark: bool,
+    /// An Interact-key target or active dialogue is currently available.
+    pub has_interactable: bool,
     pub sneaking: bool,
     pub sitting: bool,
     pub crawling: bool,
     pub dancing: bool,
     pub zoom_locked: bool,
-    /// The character has died, so respawning is the only thing left to do.
+    /// The character has died; keep only menus and the respawn control visible.
     pub dead: bool,
 }
 
@@ -72,22 +87,25 @@ pub struct Spec {
     pub active: bool,
     /// Disabled buttons are not offered.
     pub enabled: bool,
-    /// Place in the context list; also picks the position. Slots below
-    /// [`TIER_SLOTS`] are offered while "More" is closed.
+    /// Stable place in the context list and expanded grid. The closed
+    /// layout compacts enabled actions into its first [`TIER_SLOTS`] positions.
     pub slot: usize,
 }
 
-/// The context actions, in slot order. Slot order is the reading order of the
-/// grid, so the actions that belong together share a row: combat, then the
-/// toggles and emotes, then the camera.
+/// The context actions, in slot order. Nearby interactions come first so they
+/// are visible without opening "More"; then come combat, toggles and emotes,
+/// and finally the camera.
 ///
 /// Whether an action is offered at all comes from [`state_of`], which keeps
 /// this a plain list.
 const ACTIONS: [(GameInput, &str); CONTEXT_SLOTS] = [
+    (GameInput::Mount, "hud-mount"),
+    (GameInput::Trade, "hud-trade"),
+    (GameInput::StayFollow, "hud-stay"),
     (GameInput::ToggleWield, "hud-touch-draw"),
     (GameInput::Block, "hud-touch-block"),
-    (GameInput::Glide, "hud-touch-glide"),
     (GameInput::ToggleLantern, "hud-touch-lantern"),
+    (GameInput::Glide, "hud-touch-glide"),
     (GameInput::Sneak, "hud-touch-sneak"),
     (GameInput::Sit, "hud-touch-sit"),
     (GameInput::Crawl, "hud-touch-crawl"),
@@ -105,8 +123,11 @@ pub fn layout(ctx: &Context) -> Vec<Spec> {
         .enumerate()
         .map(|(slot, (input, label_key))| {
             let (active, enabled) = state_of(ctx, input);
-            // Drawing and sheathing are one input with two names.
+            // Some actions use one input to switch between two states.
             let label_key = match input {
+                GameInput::Mount if ctx.riding => "hud-unmount",
+                GameInput::StayFollow if ctx.pet_staying => "hud-follow",
+                GameInput::StayFollow => "hud-stay",
                 GameInput::ToggleWield if ctx.wielding => "hud-touch-sheathe",
                 _ => label_key,
             };
@@ -123,18 +144,35 @@ pub fn layout(ctx: &Context) -> Vec<Spec> {
 
 /// Whether an action is lit up, and whether the current state offers it.
 fn state_of(ctx: &Context, input: GameInput) -> (bool, bool) {
-    // Nothing can be done while dead but respawn, which has a button of its
-    // own, so the context actions stay out of the way.
+    // Gameplay actions are unavailable while dead; menus stay visible and
+    // respawn has its own dedicated button.
     let ready = ctx.controlling && !ctx.riding && !ctx.dead;
     let still = ready && !ctx.gliding;
     let glider = ctx.gliding || ctx.has_glider;
     let lantern = ctx.has_lantern || ctx.lantern_on;
     match input {
+        GameInput::Mount => (
+            ctx.riding,
+            ctx.controlling && !ctx.dead && (ctx.riding || ctx.has_mount_target),
+        ),
+        GameInput::Trade => (
+            false,
+            ctx.controlling && !ctx.dead && !ctx.trading && ctx.has_trade_target,
+        ),
+        GameInput::StayFollow => (
+            ctx.pet_staying,
+            ctx.controlling && !ctx.dead && ctx.has_stay_follow_target,
+        ),
         GameInput::ToggleWield => (ctx.wielding, ready),
         GameInput::Block => (false, still && ctx.wielding),
-        GameInput::Glide => (ctx.gliding, ready && glider),
-        GameInput::ToggleLantern => (ctx.lantern_on, ready && lantern),
-        GameInput::Sneak => (ctx.sneaking, still),
+        GameInput::Glide => (ctx.gliding, ready && glider && !ctx.trading),
+        // Leave the toggle available while it is on so the player can turn it
+        // back off if the surroundings brighten.
+        GameInput::ToggleLantern => (
+            ctx.lantern_on,
+            ready && lantern && (ctx.is_dark || ctx.lantern_on),
+        ),
+        GameInput::Sneak => (ctx.sneaking, still && !ctx.trading),
         GameInput::Sit => (ctx.sitting, still),
         GameInput::Crawl => (ctx.crawling, still),
         GameInput::Dance => (ctx.dancing, still),
@@ -150,7 +188,7 @@ fn state_of(ctx: &Context, input: GameInput) -> (bool, bool) {
 const D_STICK: f32 = 0.30;
 const D_ATTACK: f32 = 0.18;
 const D_SMALL: f32 = 0.13;
-const D_SLOT: f32 = 0.095;
+const D_SLOT: f32 = 0.089;
 const D_MENU: f32 = 0.085;
 
 /// Rows, as fractions of the screen height measured from the top.
@@ -160,17 +198,16 @@ const ROW_HIGH: f32 = 0.395;
 const ROW_MID: f32 = 0.585;
 const ROW_LOW: f32 = 0.80;
 
-/// Lanes, in screen-height units measured inwards from the right edge.
+/// Right-hand lanes, in screen-height units measured inwards from the edge.
 const LANE_EDGE: f32 = 0.13;
 const LANE_INNER: f32 = 0.345;
 /// Where the context column sits while "More" is closed.
 const LANE_CONTEXT: f32 = 0.56;
-const LANE_MORE: f32 = 0.775;
 
-/// Lanes of the five skill slots, and of the three menu buttons. Neighbours are
-/// one diameter plus a 0.03 gap apart, which is as tight as a thumb wants.
-const SLOT_LANES: [f32; 5] = [0.13, 0.255, 0.38, 0.505, 0.63];
-const MENU_LANES: [f32; 3] = [0.13, 0.245, 0.36];
+/// Left-hand lanes of the five skill slots and three menu buttons. The top row
+/// is deliberately kept clear of the minimap.
+const SLOT_LANES: [f32; 5] = [0.20, 0.305, 0.41, 0.515, 0.62];
+const MENU_LANES: [f32; 3] = [0.20, 0.31, 0.42];
 
 /// The movement stick is placed by width instead, so it stays under the left
 /// thumb however wide the screen is.
@@ -179,7 +216,7 @@ const STICK_Y: f32 = 0.73;
 
 /// Most columns the context grid uses, on a screen wide enough for them.
 const PANEL_COLS: usize = 3;
-/// Fewest columns it falls back to. A single column of twelve would not fit
+/// Fewest columns it falls back to. A single column of fifteen would not fit
 /// vertically either, so below this the buttons shrink instead.
 const PANEL_COLS_MIN: usize = 2;
 /// Keep-out between the grid and whatever is beside it.
@@ -203,7 +240,7 @@ const TIER_ROWS: [f32; TIER_SLOTS] = [ROW_LOW, ROW_MID, ROW_HIGH];
 
 /// Number of context actions; the array in [`layout`] must match. The grid
 /// shapes itself around this, so it is not tied to a row count.
-pub const CONTEXT_SLOTS: usize = 12;
+pub const CONTEXT_SLOTS: usize = 15;
 
 /// Buttons that exist in one state only. They come after the context actions so
 /// that every widget id stays where it is.
@@ -227,24 +264,33 @@ enum Label {
     },
 }
 
-/// An always-visible button.
+/// Which edge a fixed button's lane is measured from.
+#[derive(Clone, Copy)]
+enum Side {
+    Left,
+    Right,
+}
+
+/// A button with a fixed position in the layout.
 #[derive(Clone, Copy)]
 struct Fixed {
     /// `None` for purely visual buttons (the movement stick).
     action: Option<Kind>,
     label: Label,
+    side: Side,
     lane: f32,
     row: f32,
     diameter: f32,
 }
 
-/// Always-visible buttons, in rows from the top of the screen down.
+/// Fixed-position buttons, in rows from the top of the screen down.
 const FIXED: [Fixed; 14] = [
     // Menu row. Settings is left out on purpose: the menu button opens the
     // escape menu, which has it.
     Fixed {
         action: Some(Kind::Input(GameInput::Inventory)),
         label: Label::Key("hud-touch-inventory"),
+        side: Side::Left,
         lane: MENU_LANES[0],
         row: ROW_MENU,
         diameter: D_MENU,
@@ -252,6 +298,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Diary)),
         label: Label::Key("hud-touch-diary"),
+        side: Side::Left,
         lane: MENU_LANES[1],
         row: ROW_MENU,
         diameter: D_MENU,
@@ -259,6 +306,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Escape)),
         label: Label::Key("hud-touch-menu"),
+        side: Side::Left,
         lane: MENU_LANES[2],
         row: ROW_MENU,
         diameter: D_MENU,
@@ -267,6 +315,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Slot1)),
         label: Label::Symbol("1"),
+        side: Side::Left,
         lane: SLOT_LANES[0],
         row: ROW_SLOT,
         diameter: D_SLOT,
@@ -274,6 +323,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Slot2)),
         label: Label::Symbol("2"),
+        side: Side::Left,
         lane: SLOT_LANES[1],
         row: ROW_SLOT,
         diameter: D_SLOT,
@@ -281,6 +331,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Slot3)),
         label: Label::Symbol("3"),
+        side: Side::Left,
         lane: SLOT_LANES[2],
         row: ROW_SLOT,
         diameter: D_SLOT,
@@ -288,6 +339,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Slot4)),
         label: Label::Symbol("4"),
+        side: Side::Left,
         lane: SLOT_LANES[3],
         row: ROW_SLOT,
         diameter: D_SLOT,
@@ -295,25 +347,28 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Slot5)),
         label: Label::Symbol("5"),
+        side: Side::Left,
         lane: SLOT_LANES[4],
         row: ROW_SLOT,
         diameter: D_SLOT,
     },
-    // "More", above the context column so it never moves when the column fills.
+    // "More", at the left end of the menu row, clear of the minimap.
     Fixed {
         action: Some(Kind::More),
         label: Label::Toggle {
             closed: "hud-touch-more",
             open: "hud-touch-less",
         },
-        lane: LANE_MORE,
-        row: ROW_SLOT,
-        diameter: D_SMALL,
+        side: Side::Left,
+        lane: 0.58,
+        row: ROW_MENU,
+        diameter: D_MENU,
     },
     // Combat cluster: the attack button on the edge lane, the rest around it.
     Fixed {
         action: Some(Kind::Input(GameInput::Interact)),
         label: Label::Key("hud-touch-interact"),
+        side: Side::Right,
         lane: LANE_EDGE,
         row: ROW_HIGH,
         diameter: D_SMALL,
@@ -321,6 +376,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Jump)),
         label: Label::Key("hud-touch-jump"),
+        side: Side::Right,
         lane: LANE_EDGE,
         row: ROW_MID,
         diameter: D_SMALL,
@@ -328,6 +384,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Secondary)),
         label: Label::Key("hud-touch-alt"),
+        side: Side::Right,
         lane: LANE_INNER,
         row: ROW_MID,
         diameter: D_SMALL,
@@ -335,6 +392,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Roll)),
         label: Label::Key("hud-touch-roll"),
+        side: Side::Right,
         lane: LANE_INNER,
         row: ROW_LOW,
         diameter: D_SMALL,
@@ -342,6 +400,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Primary)),
         label: Label::Key("hud-touch-attack"),
+        side: Side::Right,
         lane: LANE_EDGE,
         row: ROW_LOW,
         diameter: D_ATTACK,
@@ -375,9 +434,14 @@ pub struct Region {
 }
 
 /// Converts a lane and a row into fractions of the screen.
-fn center_of(lane: f32, row: f32, aspect: f32) -> Vec2<f32> {
+fn center_of(side: Side, lane: f32, row: f32, aspect: f32) -> Vec2<f32> {
     // A zero aspect would only happen before the window has a size.
-    Vec2::new(1.0 - lane / aspect.max(0.1), row)
+    let aspect = aspect.max(0.1);
+    let x = match side {
+        Side::Left => lane / aspect,
+        Side::Right => 1.0 - lane / aspect,
+    };
+    Vec2::new(x, row)
 }
 
 /// The context grid as it fits on one screen, in screen-height units.
@@ -400,8 +464,8 @@ struct Grid {
 ///
 /// The grid takes as many columns as fit at the usual size and adds rows
 /// instead when the screen is too narrow for them, shrinking its buttons only
-/// as far as it has to. From a 4:3 tablet upwards that leaves the plain 3x4
-/// grid; on a squarer window it becomes 2x6 with slightly smaller buttons
+/// as far as it has to. From a 4:3 tablet upwards that leaves the plain 3x5
+/// grid; on a squarer window it becomes 2x8 with slightly smaller buttons
 /// rather than a pile of touching ones.
 fn grid(aspect: f32) -> Grid {
     let stick = STICK_X * aspect + D_STICK / 2.0;
@@ -467,19 +531,38 @@ pub fn shown(
     localize: impl Fn(&str) -> String,
 ) -> Vec<Shown> {
     let mut shown = Vec::with_capacity(COUNT);
-    shown.push(Shown {
-        index: 0,
-        action: None,
-        center: Vec2::new(STICK_X, STICK_Y),
-        diameter: D_STICK,
-        label: localize("hud-touch-move"),
-        active: false,
-    });
+    if !ctx.dead {
+        shown.push(Shown {
+            index: 0,
+            action: None,
+            center: Vec2::new(STICK_X, STICK_Y),
+            diameter: D_STICK,
+            label: localize("hud-touch-move"),
+            active: false,
+        });
+    }
     for (offset, button) in FIXED.iter().enumerate() {
+        // Death leaves menu access and the dedicated respawn control; hide
+        // movement, hotbar, context and combat controls.
+        if ctx.dead
+            && !matches!(
+                button.action,
+                Some(Kind::Input(GameInput::Inventory | GameInput::Diary | GameInput::Escape))
+            )
+        {
+            continue;
+        }
+        // Interact is useful only while a live character has something in
+        // range; keep its widget id stable when it is hidden.
+        if matches!(button.action, Some(Kind::Input(GameInput::Interact)))
+            && (!ctx.controlling || ctx.dead || !ctx.has_interactable)
+        {
+            continue;
+        }
         shown.push(Shown {
             index: offset + 1,
             action: button.action,
-            center: center_of(button.lane, button.row, aspect),
+            center: center_of(button.side, button.lane, button.row, aspect),
             diameter: button.diameter,
             label: match button.label {
                 Label::Key(key) => localize(key),
@@ -489,17 +572,28 @@ pub fn shown(
             active: matches!(button.action, Some(Kind::More)) && expanded,
         });
     }
+    let mut tier_slot = 0;
     for spec in layout(ctx) {
         if !spec.enabled {
             continue;
         }
-        let Some(placement) = context_slot(spec.slot, expanded, aspect) else {
+        let display_slot = if expanded {
+            spec.slot
+        } else {
+            if tier_slot >= TIER_SLOTS {
+                continue;
+            }
+            let slot = tier_slot;
+            tier_slot += 1;
+            slot
+        };
+        let Some(placement) = context_slot(display_slot, expanded, aspect) else {
             continue;
         };
         shown.push(Shown {
             index: 1 + FIXED.len() + spec.slot,
             action: Some(spec.kind),
-            center: center_of(placement.lane, placement.row, aspect),
+            center: center_of(Side::Right, placement.lane, placement.row, aspect),
             diameter: placement.diameter,
             label: localize(spec.label_key),
             active: spec.active,
@@ -567,11 +661,18 @@ mod tests {
         Context {
             controlling: true,
             riding: false,
+            has_mount_target: true,
+            has_trade_target: true,
+            has_stay_follow_target: true,
+            pet_staying: false,
+            trading: false,
             wielding: true,
             gliding: false,
             has_glider: true,
             has_lantern: true,
             lantern_on: true,
+            is_dark: true,
+            has_interactable: true,
             sneaking: true,
             sitting: true,
             crawling: true,
@@ -581,9 +682,7 @@ mod tests {
         }
     }
 
-    /// The state the player is in after dying. Everything is left available on
-    /// purpose: the context actions have to stay out of the way of the respawn
-    /// button even in a state the HUD would never ask for.
+    /// The state the player is in after dying: only menus and respawn remain.
     fn dead_context() -> Context {
         Context {
             dead: true,
@@ -615,6 +714,170 @@ mod tests {
                 );
             }
         }
+    }
+
+    fn has_input(buttons: &[Shown], input: GameInput) -> bool {
+        buttons.iter().any(|button| {
+            matches!(button.action, Some(Kind::Input(action)) if action == input)
+        })
+    }
+
+    #[test]
+    fn lantern_is_offered_only_when_dark_or_already_on() {
+        let mut ctx = full_context();
+        ctx.is_dark = false;
+        ctx.lantern_on = false;
+        let bright = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        assert!(!has_input(&bright, GameInput::ToggleLantern));
+
+        ctx.is_dark = true;
+        let dark = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        assert!(has_input(&dark, GameInput::ToggleLantern));
+
+        ctx.is_dark = false;
+        ctx.lantern_on = true;
+        let already_on = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        assert!(has_input(&already_on, GameInput::ToggleLantern));
+
+        ctx.has_lantern = false;
+        ctx.lantern_on = false;
+        ctx.is_dark = true;
+        let no_lantern = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        assert!(!has_input(&no_lantern, GameInput::ToggleLantern));
+    }
+
+    #[test]
+    fn interact_is_offered_only_for_a_live_player_with_a_target() {
+        let mut ctx = full_context();
+        ctx.has_interactable = false;
+        let no_target = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        assert!(!has_input(&no_target, GameInput::Interact));
+
+        ctx.has_interactable = true;
+        let in_range = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        assert!(has_input(&in_range, GameInput::Interact));
+
+        ctx.dead = true;
+        let dead = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        assert!(!has_input(&dead, GameInput::Interact));
+    }
+
+    #[test]
+    fn nearby_mount_trade_and_pet_actions_are_dynamic_and_tappable() {
+        let mut ctx = full_context();
+        ctx.has_mount_target = false;
+        ctx.has_trade_target = false;
+        ctx.has_stay_follow_target = false;
+        let no_targets = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        for input in [GameInput::Mount, GameInput::Trade, GameInput::StayFollow] {
+            assert!(!has_input(&no_targets, input), "unexpected {input:?} button");
+        }
+
+        ctx.has_mount_target = true;
+        ctx.has_trade_target = true;
+        ctx.has_stay_follow_target = true;
+        let nearby = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        let tap_regions = regions(&nearby);
+        for input in [GameInput::Mount, GameInput::Trade, GameInput::StayFollow] {
+            let button = nearby
+                .iter()
+                .find(|button| {
+                    matches!(button.action, Some(Kind::Input(action)) if action == input)
+                })
+                .unwrap_or_else(|| panic!("missing {input:?} button"));
+            let region = tap_regions
+                .iter()
+                .find(|region| matches!(region.action, Kind::Input(action) if action == input))
+                .unwrap_or_else(|| panic!("{input:?} is drawn without a matching tap region"));
+            assert_eq!(region.center, button.center);
+            assert_eq!(region.radius, button.diameter / 2.0);
+        }
+
+        // Nearby interactions take the three always-visible context slots.
+        let tier: Vec<_> = nearby
+            .iter()
+            .filter(|button| {
+                button.index > FIXED.len() && button.index <= FIXED.len() + CONTEXT_SLOTS
+            })
+            .filter_map(|button| match button.action {
+                Some(Kind::Input(input)) => Some(input),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            tier,
+            vec![GameInput::Mount, GameInput::Trade, GameInput::StayFollow],
+            "nearby interactions should not be hidden behind More",
+        );
+
+        // Mount remains available as a dismount action while already riding.
+        ctx.riding = true;
+        ctx.has_mount_target = false;
+        let riding = layout(&ctx);
+        let mount = riding
+            .iter()
+            .find(|spec| spec.kind == Kind::Input(GameInput::Mount))
+            .expect("mount slot");
+        assert!(mount.enabled && mount.active);
+        assert_eq!(mount.label_key, "hud-unmount");
+
+        // The pet toggle's text describes the action it will perform.
+        ctx.pet_staying = true;
+        let staying = layout(&ctx);
+        let stay_follow = staying
+            .iter()
+            .find(|spec| spec.kind == Kind::Input(GameInput::StayFollow))
+            .expect("stay/follow slot");
+        assert!(stay_follow.active);
+        assert_eq!(stay_follow.label_key, "hud-follow");
+
+        // The trade input is not accepted while a trade is already underway.
+        // Keep the player on foot so the Glide/Sneak checks exercise the
+        // trading gate rather than their separate riding gate.
+        ctx.riding = false;
+        ctx.trading = false;
+        let not_trading = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        assert!(has_input(&not_trading, GameInput::Glide));
+        assert!(has_input(&not_trading, GameInput::Sneak));
+
+        ctx.trading = true;
+        let trading = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        assert!(!has_input(&trading, GameInput::Trade));
+        assert!(!has_input(&trading, GameInput::Glide));
+        assert!(!has_input(&trading, GameInput::Sneak));
+    }
+
+    #[test]
+    fn menu_and_hotbar_buttons_are_clear_of_the_top_right_minimap() {
+        let buttons = shown(&full_context(), false, 1.0, str::to_owned);
+        // At aspect 1, this leaves a small buffer before a top-right minimap at
+        // its largest setting (scale 2.0).
+        let clear_of_minimap = |input| {
+            let button = buttons
+                .iter()
+                .find(|button| {
+                    matches!(button.action, Some(Kind::Input(action)) if action == input)
+                })
+                .expect("expected fixed button");
+            button.center.x + button.diameter / 2.0 <= 0.67
+        };
+        for input in [
+            GameInput::Inventory,
+            GameInput::Diary,
+            GameInput::Escape,
+            GameInput::Slot1,
+            GameInput::Slot2,
+            GameInput::Slot3,
+            GameInput::Slot4,
+            GameInput::Slot5,
+        ] {
+            assert!(clear_of_minimap(input), "{input:?} overlaps the minimap");
+        }
+        let more = buttons
+            .iter()
+            .find(|button| matches!(button.action, Some(Kind::More)))
+            .expect("expected More button");
+        assert!(more.center.x + more.diameter / 2.0 <= 0.67);
     }
 
     #[test]
@@ -667,8 +930,25 @@ mod tests {
             .iter()
             .any(|region| matches!(region.action, Kind::Input(GameInput::Respawn)));
         assert!(tappable, "the respawn button has no region to tap");
-        // Nothing that needs a living character is offered alongside it.
-        assert_eq!(drawn.len(), 1 + FIXED.len() + 1, "dead but not quiet");
+        // Keep the three menu buttons, but hide the movement stick, hotbar,
+        // context actions and combat cluster while dead.
+        assert_eq!(drawn.len(), 4, "dead HUD should only have menus and respawn");
+        for input in [GameInput::Inventory, GameInput::Diary, GameInput::Escape] {
+            assert!(has_input(&drawn, input), "dead HUD lost menu action {input:?}");
+        }
+        for input in [
+            GameInput::Slot1,
+            GameInput::Jump,
+            GameInput::Primary,
+            GameInput::Secondary,
+            GameInput::Roll,
+        ] {
+            assert!(!has_input(&drawn, input), "dead HUD still offers {input:?}");
+        }
+        assert!(
+            !drawn.iter().any(|button| matches!(button.action, Some(Kind::More))),
+            "More should be hidden when no context actions are available",
+        );
     }
 
     #[test]

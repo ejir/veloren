@@ -68,6 +68,7 @@ hud-help = Help
 hud-pet = Pet
 hud-trade = Trade
 hud-mount = Mount
+hud-unmount = Dismount
 hud-follow = Follow Me
 hud-stay = Stay Here
 hud-sit = Sit

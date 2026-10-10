@@ -55,6 +55,7 @@ hud-talk = 交談
 hud-pet = 撫摸
 hud-trade = 交易
 hud-mount = 騎乘
+hud-unmount = 下馬
 hud-follow = 跟隨
 hud-stay = 停留
 hud-sit = 坐下

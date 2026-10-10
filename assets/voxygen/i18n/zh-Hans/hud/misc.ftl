@@ -53,6 +53,7 @@ hud-mine-needs_unhandled_case = 需要 ???
 hud-talk = 交谈
 hud-trade = 交易
 hud-mount = 攀爬
+hud-unmount = 下马
 hud-sit = 坐下
 hud-steer = 操控
 hud-portal = 传送

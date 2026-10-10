@@ -82,6 +82,9 @@ use winit::event::TouchPhase;
 */
 const ZOOM_LOCK_SCROLL_DELTA_INTENT: f32 = 14.0;
 
+#[cfg(target_os = "android")]
+const TOUCH_LANTERN_DARKNESS_THRESHOLD: f32 = 0.35;
+
 /// The action to perform after a tick
 enum TickAction {
     // Continue executing
@@ -1896,6 +1899,24 @@ impl PlayState for SessionState {
                 }
             });
 
+            #[cfg(target_os = "android")]
+            let screen_dark = {
+                // Day/night alone misses caves, while local sunlight misses night.
+                // Combine both with nearby voxel glow as a lightweight estimate of
+                // whether the view would benefit from a lantern.
+                let light_pos = self
+                    .scene
+                    .camera()
+                    .get_focus_pos()
+                    .map(|coord| coord.floor() as i32);
+                let terrain = self.scene.terrain();
+                let sunlight = terrain.light_at_wpos(light_pos);
+                let glow = terrain.glow_at_wpos(light_pos);
+                let is_night = self.client.borrow().state().get_day_period().is_dark();
+                (is_night || sunlight < TOUCH_LANTERN_DARKNESS_THRESHOLD)
+                    && glow < TOUCH_LANTERN_DARKNESS_THRESHOLD
+            };
+
             let inverted_interactable_map = self.interactables.inverted_map();
 
             // Extract HUD events ensuring the client borrow gets dropped.
@@ -1906,6 +1927,8 @@ impl PlayState for SessionState {
                 self.scene.camera(),
                 global_state.clock.real_dt(),
                 HudInfo {
+                    #[cfg(target_os = "android")]
+                    screen_dark,
                     is_aiming,
                     active_mine_tool,
                     is_first_person: matches!(

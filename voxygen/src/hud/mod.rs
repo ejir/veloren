@@ -690,6 +690,9 @@ pub struct DebugInfo {
 }
 
 pub struct HudInfo<'a> {
+    /// Approximate darkness around the camera focus, used by touch controls.
+    #[cfg(target_os = "android")]
+    pub screen_dark: bool,
     pub is_aiming: bool,
     pub active_mine_tool: Option<ToolKind>,
     pub is_first_person: bool,
@@ -1622,10 +1625,54 @@ impl Hud {
                 if self.show.want_grab {
                     let char_state = char_states.get(me);
                     let inventory = inventories.get(me);
+                    let has_mount_target = entity_interactables.values().any(|interactions| {
+                        interactions.contains(&EntityInteraction::Mount)
+                    }) || block_interactables.values().any(|(_, interactions)| {
+                        interactions
+                            .iter()
+                            .any(|interaction| matches!(*interaction, BlockInteraction::Mount))
+                    });
+                    let has_trade_target = entity_interactables.values().any(|interactions| {
+                        interactions.contains(&EntityInteraction::Trade)
+                    });
+                    let pet_staying = entity_interactables.iter().find_map(
+                        |(entity, interactions)| {
+                            interactions
+                                .contains(&EntityInteraction::StayFollow)
+                                .then(|| {
+                                    char_activities
+                                        .get(*entity)
+                                        .is_some_and(|activity| activity.is_pet_staying)
+                                })
+                        },
+                    );
+                    let has_interactable = self.current_dialogue.is_some()
+                        || entity_interactables.values().any(|interactions| {
+                            interactions.iter().any(|interaction| {
+                                interaction.game_input() == GameInput::Interact
+                            })
+                        })
+                        || block_interactables.values().any(|(_, interactions)| {
+                            interactions.iter().any(|interaction| {
+                                matches!(
+                                    *interaction,
+                                    BlockInteraction::Collect { .. }
+                                        | BlockInteraction::Unlock { .. }
+                                        | BlockInteraction::Craft(_)
+                                        | BlockInteraction::Read(_)
+                                        | BlockInteraction::LightToggle(_)
+                                )
+                            })
+                        });
                     let ctx = touch_buttons::Context {
                         controlling: char_state.is_some()
                             && healths.get(me).is_some_and(|h| !h.is_dead),
                         riding: client.is_riding(),
+                        has_mount_target,
+                        has_trade_target,
+                        has_stay_follow_target: pet_staying.is_some(),
+                        pet_staying: pet_staying.unwrap_or(false),
+                        trading: client.is_trading(),
                         wielding: client.is_wielding() == Some(true),
                         gliding: client.is_gliding(),
                         has_glider: inventory.is_some_and(|inv| {
@@ -1635,6 +1682,8 @@ impl Hud {
                             inv.equipped(comp::slot::EquipSlot::Lantern).is_some()
                         }),
                         lantern_on: client.is_lantern_enabled(),
+                        is_dark: info.screen_dark,
+                        has_interactable,
                         sneaking: char_state.is_some_and(|cs| cs.is_stealthy()),
                         sitting: char_state
                             .is_some_and(|cs| matches!(cs, comp::CharacterState::Sit)),
@@ -1643,8 +1692,8 @@ impl Hud {
                         dancing: char_state
                             .is_some_and(|cs| matches!(cs, comp::CharacterState::Dance)),
                         zoom_locked: global_state.settings.gameplay.zoom_lock,
-                        // Dying leaves nothing to do but respawn, and a phone
-                        // has no key for it, so it gets a button.
+                        // Dead players keep menus, but gameplay controls are
+                        // replaced by a dedicated respawn button on touch.
                         dead: healths.get(me).is_some_and(|h| h.is_dead),
                     };
                     let aspect = (ui_widgets.win_w / ui_widgets.win_h.max(1.0)) as f32;
