@@ -19,13 +19,11 @@
 //!
 //! - The context actions form a single list. While "More" is closed, only the
 //!   first [`TIER_SLOTS`] enabled actions are offered in a column beside the
-//!   combat cluster. Opening "More" swaps that column for a grid with room for
-//!   every context action, so the screen never carries two piles of them at
-//!   once.
-//! - The grid is measured out from the space actually left between the movement
-//!   stick and the combat cluster ([`grid`]), so it fits narrow screens instead
-//!   of running into either: it drops columns and shrinks its buttons rather
-//!   than letting them touch.
+//!   combat cluster. Opening "More" keeps those actions anchored and reveals
+//!   the rest in a grid, so controls do not jump when the grid opens.
+//! - The expanded grid uses the space between the movement stick and anchored
+//!   context column. On a narrow pane it switches to two compact vertical lanes
+//!   beside the context column rather than moving the anchored actions.
 //!
 //! The tests at the bottom assert the invariants for every device shape we care
 //! about: nothing overlaps and nothing leaves the screen.
@@ -202,8 +200,12 @@ const ROW_LOW: f32 = 0.80;
 /// Right-hand lanes, in screen-height units measured inwards from the edge.
 const LANE_EDGE: f32 = 0.13;
 const LANE_INNER: f32 = 0.345;
-/// Where the context column sits while "More" is closed.
+/// Where the context column sits on standard landscape windows.
 const LANE_CONTEXT: f32 = 0.56;
+/// Narrow panes shift the context and inner combat lanes apart to leave room
+/// for a compact expanded grid without moving the context buttons on More.
+const LANE_CONTEXT_NARROW: f32 = 0.53;
+const LANE_INNER_NARROW: f32 = 0.31;
 
 /// Left-hand lanes of the five skill slots and three menu buttons. The top row
 /// is deliberately kept clear of the minimap.
@@ -217,8 +219,8 @@ const STICK_Y: f32 = 0.73;
 
 /// Most columns the context grid uses, on a screen wide enough for them.
 const PANEL_COLS: usize = 3;
-/// Fewest columns it falls back to. A single column of fifteen would not fit
-/// vertically either, so below this the buttons shrink instead.
+/// Fewest columns it falls back to. A single column of expanded-grid buttons
+/// would not fit vertically either, so below this the buttons shrink instead.
 const PANEL_COLS_MIN: usize = 2;
 /// Keep-out between the grid and whatever is beside it.
 const PANEL_MARGIN: f32 = 0.02;
@@ -243,6 +245,13 @@ const TIER_ROWS: [f32; TIER_SLOTS] = [ROW_LOW, ROW_MID, ROW_HIGH];
 /// Number of context actions; the array in [`layout`] must match. The grid
 /// shapes itself around this, so it is not tied to a row count.
 pub const CONTEXT_SLOTS: usize = 15;
+/// Expanded-grid entries after the first [`TIER_SLOTS`] actions stay anchored.
+const EXPANDED_GRID_SLOTS: usize = CONTEXT_SLOTS - TIER_SLOTS;
+/// Below this aspect ratio the expanded grid uses two vertical lanes rather
+/// than the regular horizontal panel.
+const NARROW_GRID_MAX_ASPECT: f32 = 1.2;
+/// Buttons in the compact two-column panel used by narrow panes.
+const NARROW_GRID_DIAMETER: f32 = 0.05;
 
 /// Buttons that exist in one state only. They come after the context actions so
 /// that every widget id stays where it is.
@@ -427,12 +436,23 @@ pub struct Shown {
     pub active: bool,
 }
 
-/// A region the session can hit-test, in the same fractions as [`Shown`].
+/// A square hit region matching the button's drawn square, in the same
+/// fractions as [`Shown`].
 pub struct Region {
     pub action: Kind,
     pub center: Vec2<f32>,
-    /// Radius as a fraction of the screen height.
-    pub radius: f32,
+    /// Half-side length as a fraction of the screen height.
+    pub half_extent: f32,
+}
+
+impl Region {
+    /// Whether a screen-space touch falls inside this square region.
+    pub fn contains(&self, position: Vec2<f32>, width: f32, height: f32) -> bool {
+        let center = Vec2::new(self.center.x * width, self.center.y * height);
+        let half_extent = self.half_extent * height;
+        let delta = position - center;
+        delta.x.abs() <= half_extent && delta.y.abs() <= half_extent
+    }
 }
 
 /// Converts a lane and a row into fractions of the screen.
@@ -461,22 +481,28 @@ struct Grid {
     diameter: f32,
 }
 
-/// Measures the context grid out of the space between the movement stick and
-/// the combat cluster.
-///
-/// The grid takes as many columns as fit at the usual size and adds rows
-/// instead when the screen is too narrow for them, shrinking its buttons only
-/// as far as it has to. From a 4:3 tablet upwards that leaves the plain 3x5
-/// grid; on a squarer window it becomes 2x8 with slightly smaller buttons
-/// rather than a pile of touching ones.
-fn grid(aspect: f32) -> Grid {
+/// The context column shifts outward a little on very narrow panes. The
+/// matching inner combat lane moves with it to make room for the narrow grid.
+fn context_lane(aspect: f32) -> f32 {
+    if aspect < NARROW_GRID_MAX_ASPECT {
+        LANE_CONTEXT_NARROW
+    } else {
+        LANE_CONTEXT
+    }
+}
+
+/// Measures the standard context grid out of the space between the movement
+/// stick and the anchored context column. The grid takes as many columns as
+/// fit at the usual size and adds rows instead when the screen is too narrow
+/// for them, shrinking its buttons only as far as it has to.
+fn grid(aspect: f32, slots: usize) -> Grid {
     let stick = STICK_X * aspect + D_STICK / 2.0;
-    let cluster = aspect - LANE_INNER - D_SMALL / 2.0;
+    let cluster = aspect - context_lane(aspect) - D_SMALL / 2.0;
     let free = (cluster - stick - 2.0 * PANEL_MARGIN).max(0.0);
     let columns = ((free + BUTTON_GAP) / (D_SMALL + BUTTON_GAP))
         .floor()
         .clamp(PANEL_COLS_MIN as f32, PANEL_COLS as f32) as usize;
-    let rows = CONTEXT_SLOTS.div_ceil(columns);
+    let rows = slots.div_ceil(columns);
     let row_pitch = (PANEL_ROW_BOTTOM - PANEL_ROW_TOP) / (rows - 1).max(1) as f32;
     let row_pitch = row_pitch.min(PANEL_ROW_PITCH);
     // Buttons give up size before they give up the gap, across and down.
@@ -502,15 +528,40 @@ struct Placement {
 }
 
 /// Lane and row of a context action, or `None` if it is not offered right now.
-fn context_slot(slot: usize, expanded: bool, aspect: f32) -> Option<Placement> {
+fn context_slot(slot: usize, expanded: bool, aspect: f32, grid_slots: usize) -> Option<Placement> {
     if !expanded {
         return Some(Placement {
-            lane: LANE_CONTEXT,
+            lane: context_lane(aspect),
             row: *TIER_ROWS.get(slot)?,
             diameter: D_SMALL,
         });
     }
-    let grid = grid(aspect);
+    if slot >= grid_slots {
+        return None;
+    }
+    if aspect < NARROW_GRID_MAX_ASPECT {
+        // A square split-screen pane has no horizontal room for the standard
+        // panel alongside the context column. Stack six buttons in each of
+        // two narrow lanes, with the anchored column between them and combat.
+        let rows = grid_slots.div_ceil(2);
+        let column = slot / rows;
+        let row = slot % rows;
+        let diameter = NARROW_GRID_DIAMETER;
+        let context_center = aspect - context_lane(aspect);
+        let stick_edge = STICK_X * aspect + D_STICK / 2.0;
+        let from_left = match column {
+            0 => stick_edge + diameter / 2.0 + PANEL_MARGIN,
+            1 => context_center + D_SMALL / 2.0 + diameter / 2.0 + PANEL_MARGIN,
+            _ => return None,
+        };
+        let row_pitch = (PANEL_ROW_BOTTOM - PANEL_ROW_TOP) / (rows - 1).max(1) as f32;
+        return Some(Placement {
+            lane: aspect - from_left,
+            row: PANEL_ROW_TOP + row as f32 * row_pitch,
+            diameter,
+        });
+    }
+    let grid = grid(aspect, grid_slots);
     let column = slot % grid.columns;
     let row = slot / grid.columns;
     // The grid is measured from the left, lanes from the right.
@@ -563,10 +614,20 @@ pub fn shown(
         {
             continue;
         }
+        let lane = if aspect < NARROW_GRID_MAX_ASPECT
+            && matches!(
+                button.action,
+                Some(Kind::Input(GameInput::Secondary | GameInput::Roll))
+            )
+        {
+            LANE_INNER_NARROW
+        } else {
+            button.lane
+        };
         shown.push(Shown {
             index: offset + 1,
             action: button.action,
-            center: center_of(button.side, button.lane, button.row, aspect),
+            center: center_of(button.side, lane, button.row, aspect),
             diameter: button.diameter,
             label: match button.label {
                 Label::Key(key) => localize(key),
@@ -576,22 +637,33 @@ pub fn shown(
             active: matches!(button.action, Some(Kind::More)) && expanded,
         });
     }
+    // The most-used actions keep the same three positions whether More is
+    // open or closed. The expanded grid contains only the remaining context
+    // actions; narrow panes use compact vertical lanes instead of moving them.
     let mut tier_slot = 0;
     for spec in layout(ctx) {
         if !spec.enabled {
             continue;
         }
-        let display_slot = if expanded {
-            spec.slot
-        } else {
+        let placement = if !expanded {
             if tier_slot >= TIER_SLOTS {
                 continue;
             }
             let slot = tier_slot;
             tier_slot += 1;
-            slot
+            context_slot(slot, false, aspect, CONTEXT_SLOTS)
+        } else if tier_slot < TIER_SLOTS {
+            let slot = tier_slot;
+            tier_slot += 1;
+            context_slot(slot, false, aspect, CONTEXT_SLOTS)
+        } else {
+            // Slots below TIER_SLOTS are always among the first enabled
+            // actions. Keep the remaining actions at their stable grid slots,
+            // leaving disabled entries empty instead of shifting their peers.
+            let slot = spec.slot - TIER_SLOTS;
+            context_slot(slot, true, aspect, EXPANDED_GRID_SLOTS)
         };
-        let Some(placement) = context_slot(display_slot, expanded, aspect) else {
+        let Some(placement) = placement else {
             continue;
         };
         shown.push(Shown {
@@ -626,7 +698,7 @@ pub fn regions(shown: &[Shown]) -> Vec<Region> {
             button.action.map(|action| Region {
                 action,
                 center: button.center,
-                radius: button.diameter / 2.0,
+                half_extent: button.diameter / 2.0,
             })
         })
         .collect()
@@ -694,9 +766,21 @@ mod tests {
         }
     }
 
-    /// Every state the overlay is drawn in.
-    fn contexts() -> [(&'static str, Context); 2] {
-        [("alive", full_context()), ("dead", dead_context())]
+    /// Representative states the overlay is drawn in.
+    fn contexts() -> [(&'static str, Context); 3] {
+        let mut no_nearby_targets = full_context();
+        no_nearby_targets.has_mount_target = false;
+        no_nearby_targets.has_trade_target = false;
+        no_nearby_targets.has_stay_follow_target = false;
+        no_nearby_targets.wielding = false;
+        no_nearby_targets.has_lantern = false;
+        no_nearby_targets.lantern_on = false;
+        no_nearby_targets.is_dark = false;
+        [
+            ("alive", full_context()),
+            ("no nearby targets", no_nearby_targets),
+            ("dead", dead_context()),
+        ]
     }
 
     /// Every button on screen, in screen-height units: `(index, x, y, radius)`.
@@ -711,10 +795,17 @@ mod tests {
     fn assert_apart(buttons: &[(usize, f32, f32, f32)], state: &str) {
         for (i, &(index, x, y, radius)) in buttons.iter().enumerate() {
             for &(other, x2, y2, radius2) in &buttons[i + 1..] {
-                let gap = ((x - x2).powi(2) + (y - y2).powi(2)).sqrt() - radius - radius2;
+                let half_extents = radius + radius2;
+                let dx = (x - x2).abs();
+                let dy = (y - y2).abs();
+                let gap = (dx.powi(2) + dy.powi(2)).sqrt() - half_extents;
                 assert!(
                     gap >= MIN_GAP,
                     "slots {index}/{other} gap {gap:.4}h in {state}",
+                );
+                assert!(
+                    dx >= half_extents || dy >= half_extents,
+                    "slots {index}/{other} square hit regions overlap in {state}",
                 );
             }
         }
@@ -724,6 +815,13 @@ mod tests {
         buttons
             .iter()
             .any(|button| matches!(button.action, Some(Kind::Input(action)) if action == input))
+    }
+
+    fn input_button(buttons: &[Shown], input: GameInput) -> &Shown {
+        buttons
+            .iter()
+            .find(|button| matches!(button.action, Some(Kind::Input(action)) if action == input))
+            .unwrap_or_else(|| panic!("missing {input:?} button"))
     }
 
     #[test]
@@ -797,7 +895,7 @@ mod tests {
                 .find(|region| matches!(region.action, Kind::Input(action) if action == input))
                 .unwrap_or_else(|| panic!("{input:?} is drawn without a matching tap region"));
             assert_eq!(region.center, button.center);
-            assert_eq!(region.radius, button.diameter / 2.0);
+            assert_eq!(region.half_extent, button.diameter / 2.0);
         }
 
         // Nearby interactions take the three always-visible context slots.
@@ -816,6 +914,14 @@ mod tests {
             vec![GameInput::Mount, GameInput::Trade, GameInput::StayFollow],
             "nearby interactions should not be hidden behind More",
         );
+        let nearby_expanded = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        for input in [GameInput::Mount, GameInput::Trade, GameInput::StayFollow] {
+            assert_eq!(
+                input_button(&nearby_expanded, input).center,
+                input_button(&nearby, input).center,
+                "nearby {input:?} moved when More opened",
+            );
+        }
 
         // Mount remains available as a dismount action while already riding.
         ctx.riding = true;
@@ -852,6 +958,58 @@ mod tests {
         assert!(!has_input(&trading, GameInput::Trade));
         assert!(!has_input(&trading, GameInput::Glide));
         assert!(!has_input(&trading, GameInput::Sneak));
+    }
+
+    #[test]
+    fn opening_more_keeps_visible_context_buttons_in_place() {
+        let mut ctx = full_context();
+        ctx.has_mount_target = false;
+        ctx.has_trade_target = false;
+        ctx.has_stay_follow_target = false;
+        ctx.wielding = false;
+        ctx.has_lantern = false;
+        ctx.lantern_on = false;
+        ctx.is_dark = false;
+
+        // Glide is one of the three visible actions in this state. More must
+        // reveal the extra grid without reflowing it or the other visible ones.
+        for aspect in ASPECTS {
+            let closed = shown(&ctx, false, aspect, str::to_owned);
+            let open = shown(&ctx, true, aspect, str::to_owned);
+            for input in [GameInput::ToggleWield, GameInput::Glide, GameInput::Sneak] {
+                let closed_button = input_button(&closed, input);
+                let open_button = input_button(&open, input);
+                assert_eq!(
+                    open_button.center, closed_button.center,
+                    "{input:?} moved when More opened at aspect {aspect:.2}",
+                );
+                assert_eq!(
+                    open_button.diameter, closed_button.diameter,
+                    "{input:?} changed size when More opened at aspect {aspect:.2}",
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn touch_regions_match_the_drawn_square() {
+        let buttons = shown(&full_context(), true, 16.0 / 9.0, str::to_owned);
+        let glide = input_button(&buttons, GameInput::Glide);
+        let region = regions(&buttons)
+            .into_iter()
+            .find(|region| region.action == Kind::Input(GameInput::Glide))
+            .expect("Glide button has no touch region");
+        let width = 1920.0;
+        let height = 1080.0;
+        let center = Vec2::new(glide.center.x * width, glide.center.y * height);
+        let half_extent = glide.diameter * height / 2.0;
+
+        // This diagonal point is inside the visual square but outside the old
+        // circular hit region, so it must still reach the button, not movement.
+        let square_corner = center + Vec2::new(half_extent * 0.9, half_extent * 0.9);
+        assert!(region.contains(square_corner, width, height));
+        let outside = center + Vec2::new(half_extent * 1.01, 0.0);
+        assert!(!region.contains(outside, width, height));
     }
 
     #[test]
