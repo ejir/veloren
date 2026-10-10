@@ -730,22 +730,22 @@ mod tests {
         let mut ctx = full_context();
         ctx.is_dark = false;
         ctx.lantern_on = false;
-        let bright = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        let bright = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
         assert!(!has_input(&bright, GameInput::ToggleLantern));
 
         ctx.is_dark = true;
-        let dark = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        let dark = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
         assert!(has_input(&dark, GameInput::ToggleLantern));
 
         ctx.is_dark = false;
         ctx.lantern_on = true;
-        let already_on = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        let already_on = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
         assert!(has_input(&already_on, GameInput::ToggleLantern));
 
         ctx.has_lantern = false;
         ctx.lantern_on = false;
         ctx.is_dark = true;
-        let no_lantern = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        let no_lantern = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
         assert!(!has_input(&no_lantern, GameInput::ToggleLantern));
     }
 
