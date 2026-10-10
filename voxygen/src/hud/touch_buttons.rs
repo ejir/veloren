@@ -618,8 +618,7 @@ pub fn shown(
             && matches!(
                 button.action,
                 Some(Kind::Input(GameInput::Secondary | GameInput::Roll))
-            )
-        {
+            ) {
             LANE_INNER_NARROW
         } else {
             button.lane

@@ -116,9 +116,11 @@ fn android_touch_button(
     width: f32,
     height: f32,
 ) -> Option<crate::hud::touch_buttons::Kind> {
-    regions
-        .iter()
-        .find_map(|region| region.contains(position, width, height).then_some(region.action))
+    regions.iter().find_map(|region| {
+        region
+            .contains(position, width, height)
+            .then_some(region.action)
+    })
 }
 
 #[derive(Default)]
