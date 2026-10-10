@@ -1625,32 +1625,34 @@ impl Hud {
                 if self.show.want_grab {
                     let char_state = char_states.get(me);
                     let inventory = inventories.get(me);
-                    let has_mount_target = entity_interactables.values().any(|interactions| {
-                        interactions.contains(&EntityInteraction::Mount)
-                    }) || block_interactables.values().any(|(_, interactions)| {
-                        interactions
-                            .iter()
-                            .any(|interaction| matches!(*interaction, BlockInteraction::Mount))
-                    });
-                    let has_trade_target = entity_interactables.values().any(|interactions| {
-                        interactions.contains(&EntityInteraction::Trade)
-                    });
-                    let pet_staying = entity_interactables.iter().find_map(
-                        |(entity, interactions)| {
+                    let has_mount_target = entity_interactables
+                        .values()
+                        .any(|interactions| interactions.contains(&EntityInteraction::Mount))
+                        || block_interactables.values().any(|(_, interactions)| {
                             interactions
-                                .contains(&EntityInteraction::StayFollow)
-                                .then(|| {
-                                    char_activities
-                                        .get(*entity)
-                                        .is_some_and(|activity| activity.is_pet_staying)
-                                })
-                        },
-                    );
+                                .iter()
+                                .any(|interaction| matches!(*interaction, BlockInteraction::Mount))
+                        });
+                    let has_trade_target = entity_interactables
+                        .values()
+                        .any(|interactions| interactions.contains(&EntityInteraction::Trade));
+                    let pet_staying =
+                        entity_interactables
+                            .iter()
+                            .find_map(|(entity, interactions)| {
+                                interactions
+                                    .contains(&EntityInteraction::StayFollow)
+                                    .then(|| {
+                                        char_activities
+                                            .get(*entity)
+                                            .is_some_and(|activity| activity.is_pet_staying)
+                                    })
+                            });
                     let has_interactable = self.current_dialogue.is_some()
                         || entity_interactables.values().any(|interactions| {
-                            interactions.iter().any(|interaction| {
-                                interaction.game_input() == GameInput::Interact
-                            })
+                            interactions
+                                .iter()
+                                .any(|interaction| interaction.game_input() == GameInput::Interact)
                         })
                         || block_interactables.values().any(|(_, interactions)| {
                             interactions.iter().any(|interaction| {

@@ -20,7 +20,8 @@
 //! - The context actions form a single list. While "More" is closed, only the
 //!   first [`TIER_SLOTS`] enabled actions are offered in a column beside the
 //!   combat cluster. Opening "More" swaps that column for a grid with room for
-//!   every context action, so the screen never carries two piles of them at once.
+//!   every context action, so the screen never carries two piles of them at
+//!   once.
 //! - The grid is measured out from the space actually left between the movement
 //!   stick and the combat cluster ([`grid`]), so it fits narrow screens instead
 //!   of running into either: it drops columns and shrinks its buttons rather
@@ -547,7 +548,9 @@ pub fn shown(
         if ctx.dead
             && !matches!(
                 button.action,
-                Some(Kind::Input(GameInput::Inventory | GameInput::Diary | GameInput::Escape))
+                Some(Kind::Input(
+                    GameInput::Inventory | GameInput::Diary | GameInput::Escape
+                ))
             )
         {
             continue;
@@ -717,9 +720,9 @@ mod tests {
     }
 
     fn has_input(buttons: &[Shown], input: GameInput) -> bool {
-        buttons.iter().any(|button| {
-            matches!(button.action, Some(Kind::Input(action)) if action == input)
-        })
+        buttons
+            .iter()
+            .any(|button| matches!(button.action, Some(Kind::Input(action)) if action == input))
     }
 
     #[test]
@@ -770,7 +773,10 @@ mod tests {
         ctx.has_stay_follow_target = false;
         let no_targets = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
         for input in [GameInput::Mount, GameInput::Trade, GameInput::StayFollow] {
-            assert!(!has_input(&no_targets, input), "unexpected {input:?} button");
+            assert!(
+                !has_input(&no_targets, input),
+                "unexpected {input:?} button"
+            );
         }
 
         ctx.has_mount_target = true;
@@ -781,9 +787,9 @@ mod tests {
         for input in [GameInput::Mount, GameInput::Trade, GameInput::StayFollow] {
             let button = nearby
                 .iter()
-                .find(|button| {
-                    matches!(button.action, Some(Kind::Input(action)) if action == input)
-                })
+                .find(
+                    |button| matches!(button.action, Some(Kind::Input(action)) if action == input),
+                )
                 .unwrap_or_else(|| panic!("missing {input:?} button"));
             let region = tap_regions
                 .iter()
@@ -855,9 +861,9 @@ mod tests {
         let clear_of_minimap = |input| {
             let button = buttons
                 .iter()
-                .find(|button| {
-                    matches!(button.action, Some(Kind::Input(action)) if action == input)
-                })
+                .find(
+                    |button| matches!(button.action, Some(Kind::Input(action)) if action == input),
+                )
                 .expect("expected fixed button");
             button.center.x + button.diameter / 2.0 <= 0.67
         };
@@ -932,9 +938,16 @@ mod tests {
         assert!(tappable, "the respawn button has no region to tap");
         // Keep the three menu buttons, but hide the movement stick, hotbar,
         // context actions and combat cluster while dead.
-        assert_eq!(drawn.len(), 4, "dead HUD should only have menus and respawn");
+        assert_eq!(
+            drawn.len(),
+            4,
+            "dead HUD should only have menus and respawn"
+        );
         for input in [GameInput::Inventory, GameInput::Diary, GameInput::Escape] {
-            assert!(has_input(&drawn, input), "dead HUD lost menu action {input:?}");
+            assert!(
+                has_input(&drawn, input),
+                "dead HUD lost menu action {input:?}"
+            );
         }
         for input in [
             GameInput::Slot1,
@@ -946,7 +959,9 @@ mod tests {
             assert!(!has_input(&drawn, input), "dead HUD still offers {input:?}");
         }
         assert!(
-            !drawn.iter().any(|button| matches!(button.action, Some(Kind::More))),
+            !drawn
+                .iter()
+                .any(|button| matches!(button.action, Some(Kind::More))),
             "More should be hidden when no context actions are available",
         );
     }
