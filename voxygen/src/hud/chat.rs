@@ -5,7 +5,10 @@ use super::{
 use crate::{
     GlobalState,
     cmd::complete,
-    settings::{ChatSettings, chat::MAX_CHAT_TABS},
+    settings::{
+        ChatSettings,
+        chat::{DEFAULT_CHAT_BOX_HEIGHT, DEFAULT_CHAT_BOX_WIDTH, MAX_CHAT_TABS},
+    },
     ui::{
         Scale,
         fonts::{Font, Fonts},
@@ -88,9 +91,21 @@ const CHAT_MARGIN_THICKNESS: f64 = 2.0;
 const CHAT_ICON_HEIGHT: f64 = 16.0;
 const MIN_DIMENSION: Vec2<f64> = Vec2::new(400.0, 150.0);
 const MAX_DIMENSION: Vec2<f64> = Vec2::new(650.0, 500.0);
+/// Keep the default mobile chat box left of the touch-action grid when More is
+/// open, with some spare width for the left margin and layout rounding.
+const MOBILE_CHAT_WIDTH_FRACTION: f64 = 0.21;
+const MOBILE_CHAT_HEIGHT_FRACTION: f64 = 0.24;
+const LEGACY_DEFAULT_CHAT_BOX_SIZE: Vec2<f64> = Vec2::new(470.0, 150.0);
 
 const CHAT_TAB_HEIGHT: f64 = 20.0;
 const CHAT_TAB_ALL_WIDTH: f64 = 40.0;
+
+fn compact_mobile_chat_size(default_size: Vec2<f64>, window_size: Vec2<f64>) -> Vec2<f64> {
+    Vec2::new(
+        default_size.x.min(window_size.x * MOBILE_CHAT_WIDTH_FRACTION),
+        default_size.y.min(window_size.y * MOBILE_CHAT_HEIGHT_FRACTION),
+    )
+}
 
 /*#[const_tweaker::tweak(min = 0.0, max = 60.0, step = 1.0)]
 const X: f64 = 18.0;*/
@@ -295,7 +310,16 @@ impl Widget for Chat<'_> {
         let force_chat = !(&self.global_state.settings.interface.toggle_chat);
         let chat_tabs = &chat_settings.chat_tabs;
         let current_chat_tab = chat_settings.chat_tab_index.and_then(|i| chat_tabs.get(i));
-        let chat_size = Vec2::new(chat_settings.chat_size_x, chat_settings.chat_size_y);
+        let configured_chat_size = Vec2::new(chat_settings.chat_size_x, chat_settings.chat_size_y);
+        let mobile_default_size = Vec2::new(DEFAULT_CHAT_BOX_WIDTH, DEFAULT_CHAT_BOX_HEIGHT);
+        let uses_mobile_default = cfg!(target_os = "android")
+            && (configured_chat_size == mobile_default_size
+                || configured_chat_size == LEGACY_DEFAULT_CHAT_BOX_SIZE);
+        let chat_size = if uses_mobile_default {
+            compact_mobile_chat_size(mobile_default_size, Vec2::new(ui.win_w, ui.win_h))
+        } else {
+            configured_chat_size
+        };
         let chat_pos = Vec2::new(chat_settings.chat_pos_x, chat_settings.chat_pos_y);
         let chat_box_input_width = chat_size.x - CHAT_ICON_WIDTH - 12.0;
 
@@ -1153,6 +1177,21 @@ fn change_chat_mode(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compact_mobile_chat_size_fits_small_windows_and_keeps_defaults_on_large_ones() {
+        let default_size = Vec2::new(360.0, 120.0);
+        let compact = compact_mobile_chat_size(default_size, Vec2::new(720.0, 405.0));
+        assert!(compact.x <= 720.0 * MOBILE_CHAT_WIDTH_FRACTION);
+        assert!(compact.x + 10.0 < 720.0 * 0.24);
+        assert!(compact.y <= 405.0 * MOBILE_CHAT_HEIGHT_FRACTION);
+        assert!(compact.x < default_size.x && compact.y < default_size.y);
+
+        assert_eq!(
+            compact_mobile_chat_size(default_size, Vec2::new(1920.0, 1080.0)),
+            default_size,
+        );
+    }
 
     #[test]
     fn parse_cmds() {
