@@ -6,24 +6,24 @@
 //!
 //! # Layout
 //!
-//! Diameters and rows are fractions of the screen *height*, and the right-hand
-//! zones are lanes counted inwards from the right edge. One unit therefore
-//! means the same physical size on a 4:3 tablet and on a 21:9 phone. Callers
+//! Diameters and rows are fractions of the screen *height*. Left and right
+//! lanes are measured inwards from their respective edges, so one unit means
+//! the same physical size on a 4:3 tablet and on a 21:9 phone. Callers
 //! pass the aspect ratio; [`Shown::center`] comes back as fractions of the
 //! screen, which is what the drawing code and the hit-testing already speak.
 //!
 //! The screen is organised in rows (menus, skill slots, then the combat
-//! cluster) and lanes (edge, inner, context). Two rules keep it from getting
-//! crowded:
+//! cluster) and lanes (left, edge, inner, context). Menu and skill-slot lanes
+//! stay to the left of the default top-right minimap; combat lanes are counted
+//! in from the right. Two rules keep it from getting crowded:
 //!
 //! - The context actions form a single list. While "More" is closed, only the
-//!   first [`TIER_SLOTS`] of them are offered, in a column beside the combat
-//!   cluster. Opening "More" swaps that column for a grid with room for every
-//!   context action, so the screen never carries two piles of them at once.
-//! - The grid is measured out from the space actually left between the movement
-//!   stick and the combat cluster ([`grid`]), so it fits narrow screens instead
-//!   of running into either: it drops columns and shrinks its buttons rather
-//!   than letting them touch.
+//!   first [`TIER_SLOTS`] enabled actions are offered in a column beside the
+//!   combat cluster. Opening "More" keeps those actions anchored and reveals
+//!   the rest in a grid, so controls do not jump when the grid opens.
+//! - The expanded grid uses the space between the movement stick and anchored
+//!   context column. On a narrow pane it switches to two compact vertical lanes
+//!   beside the context column rather than moving the anchored actions.
 //!
 //! The tests at the bottom assert the invariants for every device shape we care
 //! about: nothing overlaps and nothing leaves the screen.
@@ -45,7 +45,19 @@ pub enum Kind {
 pub struct Context {
     /// The player has a living character that can take actions.
     pub controlling: bool,
+    /// The chat panel is currently visible.
+    pub chat_visible: bool,
     pub riding: bool,
+    /// A mountable entity or block is in interaction range.
+    pub has_mount_target: bool,
+    /// A tradeable entity is in interaction range.
+    pub has_trade_target: bool,
+    /// An owned pet can be told to stay or follow.
+    pub has_stay_follow_target: bool,
+    /// Whether the target pet is currently staying.
+    pub pet_staying: bool,
+    /// A trade is active; Glide and Sneak inputs are ignored then.
+    pub trading: bool,
     pub wielding: bool,
     pub gliding: bool,
     /// A glider is equipped, so gliding can start.
@@ -53,12 +65,16 @@ pub struct Context {
     /// A lantern is equipped, so the lantern can be turned on.
     pub has_lantern: bool,
     pub lantern_on: bool,
+    /// The scene around the player is dark enough to benefit from a lantern.
+    pub is_dark: bool,
+    /// An Interact-key target or active dialogue is currently available.
+    pub has_interactable: bool,
     pub sneaking: bool,
     pub sitting: bool,
     pub crawling: bool,
     pub dancing: bool,
     pub zoom_locked: bool,
-    /// The character has died, so respawning is the only thing left to do.
+    /// The character has died; keep only menus and the respawn control visible.
     pub dead: bool,
 }
 
@@ -72,22 +88,26 @@ pub struct Spec {
     pub active: bool,
     /// Disabled buttons are not offered.
     pub enabled: bool,
-    /// Place in the context list; also picks the position. Slots below
-    /// [`TIER_SLOTS`] are offered while "More" is closed.
+    /// Stable place in the context list and expanded grid. The closed
+    /// layout compacts enabled actions into its first [`TIER_SLOTS`] positions.
     pub slot: usize,
 }
 
-/// The context actions, in slot order. Slot order is the reading order of the
-/// grid, so the actions that belong together share a row: combat, then the
-/// toggles and emotes, then the camera.
+/// The context actions, in slot order. Nearby interactions stay visible without
+/// More; the chat toggle leads the expanded actions, followed by combat,
+/// toggles and emotes, and finally the camera.
 ///
 /// Whether an action is offered at all comes from [`state_of`], which keeps
 /// this a plain list.
 const ACTIONS: [(GameInput, &str); CONTEXT_SLOTS] = [
+    (GameInput::Mount, "hud-mount"),
+    (GameInput::Trade, "hud-trade"),
+    (GameInput::StayFollow, "hud-stay"),
+    (GameInput::ToggleChat, "hud-touch-chat"),
     (GameInput::ToggleWield, "hud-touch-draw"),
     (GameInput::Block, "hud-touch-block"),
-    (GameInput::Glide, "hud-touch-glide"),
     (GameInput::ToggleLantern, "hud-touch-lantern"),
+    (GameInput::Glide, "hud-touch-glide"),
     (GameInput::Sneak, "hud-touch-sneak"),
     (GameInput::Sit, "hud-touch-sit"),
     (GameInput::Crawl, "hud-touch-crawl"),
@@ -105,8 +125,11 @@ pub fn layout(ctx: &Context) -> Vec<Spec> {
         .enumerate()
         .map(|(slot, (input, label_key))| {
             let (active, enabled) = state_of(ctx, input);
-            // Drawing and sheathing are one input with two names.
+            // Some actions use one input to switch between two states.
             let label_key = match input {
+                GameInput::Mount if ctx.riding => "hud-unmount",
+                GameInput::StayFollow if ctx.pet_staying => "hud-follow",
+                GameInput::StayFollow => "hud-stay",
                 GameInput::ToggleWield if ctx.wielding => "hud-touch-sheathe",
                 _ => label_key,
             };
@@ -123,18 +146,36 @@ pub fn layout(ctx: &Context) -> Vec<Spec> {
 
 /// Whether an action is lit up, and whether the current state offers it.
 fn state_of(ctx: &Context, input: GameInput) -> (bool, bool) {
-    // Nothing can be done while dead but respawn, which has a button of its
-    // own, so the context actions stay out of the way.
+    // Gameplay actions are unavailable while dead; menus stay visible and
+    // respawn has its own dedicated button.
     let ready = ctx.controlling && !ctx.riding && !ctx.dead;
     let still = ready && !ctx.gliding;
     let glider = ctx.gliding || ctx.has_glider;
     let lantern = ctx.has_lantern || ctx.lantern_on;
     match input {
+        GameInput::Mount => (
+            ctx.riding,
+            ctx.controlling && !ctx.dead && (ctx.riding || ctx.has_mount_target),
+        ),
+        GameInput::Trade => (
+            false,
+            ctx.controlling && !ctx.dead && !ctx.trading && ctx.has_trade_target,
+        ),
+        GameInput::StayFollow => (
+            ctx.pet_staying,
+            ctx.controlling && !ctx.dead && ctx.has_stay_follow_target,
+        ),
+        GameInput::ToggleChat => (ctx.chat_visible, true),
         GameInput::ToggleWield => (ctx.wielding, ready),
         GameInput::Block => (false, still && ctx.wielding),
-        GameInput::Glide => (ctx.gliding, ready && glider),
-        GameInput::ToggleLantern => (ctx.lantern_on, ready && lantern),
-        GameInput::Sneak => (ctx.sneaking, still),
+        GameInput::Glide => (ctx.gliding, ready && glider && !ctx.trading),
+        // Leave the toggle available while it is on so the player can turn it
+        // back off if the surroundings brighten.
+        GameInput::ToggleLantern => (
+            ctx.lantern_on,
+            ready && lantern && (ctx.is_dark || ctx.lantern_on),
+        ),
+        GameInput::Sneak => (ctx.sneaking, still && !ctx.trading),
         GameInput::Sit => (ctx.sitting, still),
         GameInput::Crawl => (ctx.crawling, still),
         GameInput::Dance => (ctx.dancing, still),
@@ -150,7 +191,7 @@ fn state_of(ctx: &Context, input: GameInput) -> (bool, bool) {
 const D_STICK: f32 = 0.30;
 const D_ATTACK: f32 = 0.18;
 const D_SMALL: f32 = 0.13;
-const D_SLOT: f32 = 0.095;
+const D_SLOT: f32 = 0.089;
 const D_MENU: f32 = 0.085;
 
 /// Rows, as fractions of the screen height measured from the top.
@@ -160,17 +201,20 @@ const ROW_HIGH: f32 = 0.395;
 const ROW_MID: f32 = 0.585;
 const ROW_LOW: f32 = 0.80;
 
-/// Lanes, in screen-height units measured inwards from the right edge.
+/// Right-hand lanes, in screen-height units measured inwards from the edge.
 const LANE_EDGE: f32 = 0.13;
 const LANE_INNER: f32 = 0.345;
-/// Where the context column sits while "More" is closed.
+/// Where the context column sits on standard landscape windows.
 const LANE_CONTEXT: f32 = 0.56;
-const LANE_MORE: f32 = 0.775;
+/// Narrow panes shift the context and inner combat lanes apart to leave room
+/// for a compact expanded grid without moving the context buttons on More.
+const LANE_CONTEXT_NARROW: f32 = 0.53;
+const LANE_INNER_NARROW: f32 = 0.31;
 
-/// Lanes of the five skill slots, and of the three menu buttons. Neighbours are
-/// one diameter plus a 0.03 gap apart, which is as tight as a thumb wants.
-const SLOT_LANES: [f32; 5] = [0.13, 0.255, 0.38, 0.505, 0.63];
-const MENU_LANES: [f32; 3] = [0.13, 0.245, 0.36];
+/// Left-hand lanes of the five skill slots and three menu buttons. The top row
+/// is deliberately kept clear of the minimap.
+const SLOT_LANES: [f32; 5] = [0.20, 0.305, 0.41, 0.515, 0.62];
+const MENU_LANES: [f32; 3] = [0.20, 0.31, 0.42];
 
 /// The movement stick is placed by width instead, so it stays under the left
 /// thumb however wide the screen is.
@@ -179,8 +223,8 @@ const STICK_Y: f32 = 0.73;
 
 /// Most columns the context grid uses, on a screen wide enough for them.
 const PANEL_COLS: usize = 3;
-/// Fewest columns it falls back to. A single column of twelve would not fit
-/// vertically either, so below this the buttons shrink instead.
+/// Fewest columns it falls back to. A single column of expanded-grid buttons
+/// would not fit vertically either, so below this the buttons shrink instead.
 const PANEL_COLS_MIN: usize = 2;
 /// Keep-out between the grid and whatever is beside it.
 const PANEL_MARGIN: f32 = 0.02;
@@ -193,8 +237,9 @@ const PANEL_SPACING_MAX: f32 = 0.30;
 const PANEL_D_MIN: f32 = 0.06;
 /// First row of the grid, how far down it may reach, and the row pitch it
 /// prefers when there is room for it.
-const PANEL_ROW_TOP: f32 = 0.36;
-const PANEL_ROW_BOTTOM: f32 = 0.92;
+const PANEL_ROW_TOP: f32 = 0.32;
+/// Leave a clear strip above the game's centered bottom hotbar.
+const PANEL_ROW_BOTTOM: f32 = 0.85;
 const PANEL_ROW_PITCH: f32 = 0.16;
 
 /// Context actions offered while "More" is closed, and where they sit.
@@ -203,7 +248,14 @@ const TIER_ROWS: [f32; TIER_SLOTS] = [ROW_LOW, ROW_MID, ROW_HIGH];
 
 /// Number of context actions; the array in [`layout`] must match. The grid
 /// shapes itself around this, so it is not tied to a row count.
-pub const CONTEXT_SLOTS: usize = 12;
+pub const CONTEXT_SLOTS: usize = 16;
+/// Expanded-grid entries after the first [`TIER_SLOTS`] actions stay anchored.
+const EXPANDED_GRID_SLOTS: usize = CONTEXT_SLOTS - TIER_SLOTS;
+/// Below this aspect ratio the expanded grid uses two vertical lanes rather
+/// than the regular horizontal panel.
+const NARROW_GRID_MAX_ASPECT: f32 = 1.2;
+/// Buttons in the compact two-column panel used by narrow panes.
+const NARROW_GRID_DIAMETER: f32 = 0.05;
 
 /// Buttons that exist in one state only. They come after the context actions so
 /// that every widget id stays where it is.
@@ -227,24 +279,33 @@ enum Label {
     },
 }
 
-/// An always-visible button.
+/// Which edge a fixed button's lane is measured from.
+#[derive(Clone, Copy)]
+enum Side {
+    Left,
+    Right,
+}
+
+/// A button with a fixed position in the layout.
 #[derive(Clone, Copy)]
 struct Fixed {
     /// `None` for purely visual buttons (the movement stick).
     action: Option<Kind>,
     label: Label,
+    side: Side,
     lane: f32,
     row: f32,
     diameter: f32,
 }
 
-/// Always-visible buttons, in rows from the top of the screen down.
+/// Fixed-position buttons, in rows from the top of the screen down.
 const FIXED: [Fixed; 14] = [
     // Menu row. Settings is left out on purpose: the menu button opens the
     // escape menu, which has it.
     Fixed {
         action: Some(Kind::Input(GameInput::Inventory)),
         label: Label::Key("hud-touch-inventory"),
+        side: Side::Left,
         lane: MENU_LANES[0],
         row: ROW_MENU,
         diameter: D_MENU,
@@ -252,6 +313,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Diary)),
         label: Label::Key("hud-touch-diary"),
+        side: Side::Left,
         lane: MENU_LANES[1],
         row: ROW_MENU,
         diameter: D_MENU,
@@ -259,6 +321,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Escape)),
         label: Label::Key("hud-touch-menu"),
+        side: Side::Left,
         lane: MENU_LANES[2],
         row: ROW_MENU,
         diameter: D_MENU,
@@ -267,6 +330,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Slot1)),
         label: Label::Symbol("1"),
+        side: Side::Left,
         lane: SLOT_LANES[0],
         row: ROW_SLOT,
         diameter: D_SLOT,
@@ -274,6 +338,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Slot2)),
         label: Label::Symbol("2"),
+        side: Side::Left,
         lane: SLOT_LANES[1],
         row: ROW_SLOT,
         diameter: D_SLOT,
@@ -281,6 +346,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Slot3)),
         label: Label::Symbol("3"),
+        side: Side::Left,
         lane: SLOT_LANES[2],
         row: ROW_SLOT,
         diameter: D_SLOT,
@@ -288,6 +354,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Slot4)),
         label: Label::Symbol("4"),
+        side: Side::Left,
         lane: SLOT_LANES[3],
         row: ROW_SLOT,
         diameter: D_SLOT,
@@ -295,25 +362,28 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Slot5)),
         label: Label::Symbol("5"),
+        side: Side::Left,
         lane: SLOT_LANES[4],
         row: ROW_SLOT,
         diameter: D_SLOT,
     },
-    // "More", above the context column so it never moves when the column fills.
+    // "More", at the left end of the menu row, clear of the minimap.
     Fixed {
         action: Some(Kind::More),
         label: Label::Toggle {
             closed: "hud-touch-more",
             open: "hud-touch-less",
         },
-        lane: LANE_MORE,
-        row: ROW_SLOT,
-        diameter: D_SMALL,
+        side: Side::Left,
+        lane: 0.58,
+        row: ROW_MENU,
+        diameter: D_MENU,
     },
     // Combat cluster: the attack button on the edge lane, the rest around it.
     Fixed {
         action: Some(Kind::Input(GameInput::Interact)),
         label: Label::Key("hud-touch-interact"),
+        side: Side::Right,
         lane: LANE_EDGE,
         row: ROW_HIGH,
         diameter: D_SMALL,
@@ -321,6 +391,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Jump)),
         label: Label::Key("hud-touch-jump"),
+        side: Side::Right,
         lane: LANE_EDGE,
         row: ROW_MID,
         diameter: D_SMALL,
@@ -328,6 +399,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Secondary)),
         label: Label::Key("hud-touch-alt"),
+        side: Side::Right,
         lane: LANE_INNER,
         row: ROW_MID,
         diameter: D_SMALL,
@@ -335,6 +407,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Roll)),
         label: Label::Key("hud-touch-roll"),
+        side: Side::Right,
         lane: LANE_INNER,
         row: ROW_LOW,
         diameter: D_SMALL,
@@ -342,6 +415,7 @@ const FIXED: [Fixed; 14] = [
     Fixed {
         action: Some(Kind::Input(GameInput::Primary)),
         label: Label::Key("hud-touch-attack"),
+        side: Side::Right,
         lane: LANE_EDGE,
         row: ROW_LOW,
         diameter: D_ATTACK,
@@ -366,18 +440,34 @@ pub struct Shown {
     pub active: bool,
 }
 
-/// A region the session can hit-test, in the same fractions as [`Shown`].
+/// A square hit region matching the button's drawn square, in the same
+/// fractions as [`Shown`].
 pub struct Region {
     pub action: Kind,
     pub center: Vec2<f32>,
-    /// Radius as a fraction of the screen height.
-    pub radius: f32,
+    /// Half-side length as a fraction of the screen height.
+    pub half_extent: f32,
+}
+
+impl Region {
+    /// Whether a screen-space touch falls inside this square region.
+    pub fn contains(&self, position: Vec2<f32>, width: f32, height: f32) -> bool {
+        let center = Vec2::new(self.center.x * width, self.center.y * height);
+        let half_extent = self.half_extent * height;
+        let delta = position - center;
+        delta.x.abs() <= half_extent && delta.y.abs() <= half_extent
+    }
 }
 
 /// Converts a lane and a row into fractions of the screen.
-fn center_of(lane: f32, row: f32, aspect: f32) -> Vec2<f32> {
+fn center_of(side: Side, lane: f32, row: f32, aspect: f32) -> Vec2<f32> {
     // A zero aspect would only happen before the window has a size.
-    Vec2::new(1.0 - lane / aspect.max(0.1), row)
+    let aspect = aspect.max(0.1);
+    let x = match side {
+        Side::Left => lane / aspect,
+        Side::Right => 1.0 - lane / aspect,
+    };
+    Vec2::new(x, row)
 }
 
 /// The context grid as it fits on one screen, in screen-height units.
@@ -395,22 +485,28 @@ struct Grid {
     diameter: f32,
 }
 
-/// Measures the context grid out of the space between the movement stick and
-/// the combat cluster.
-///
-/// The grid takes as many columns as fit at the usual size and adds rows
-/// instead when the screen is too narrow for them, shrinking its buttons only
-/// as far as it has to. From a 4:3 tablet upwards that leaves the plain 3x4
-/// grid; on a squarer window it becomes 2x6 with slightly smaller buttons
-/// rather than a pile of touching ones.
-fn grid(aspect: f32) -> Grid {
+/// The context column shifts outward a little on very narrow panes. The
+/// matching inner combat lane moves with it to make room for the narrow grid.
+fn context_lane(aspect: f32) -> f32 {
+    if aspect < NARROW_GRID_MAX_ASPECT {
+        LANE_CONTEXT_NARROW
+    } else {
+        LANE_CONTEXT
+    }
+}
+
+/// Measures the standard context grid out of the space between the movement
+/// stick and the anchored context column. The grid takes as many columns as
+/// fit at the usual size and adds rows instead when the screen is too narrow
+/// for them, shrinking its buttons only as far as it has to.
+fn grid(aspect: f32, slots: usize) -> Grid {
     let stick = STICK_X * aspect + D_STICK / 2.0;
-    let cluster = aspect - LANE_INNER - D_SMALL / 2.0;
+    let cluster = aspect - context_lane(aspect) - D_SMALL / 2.0;
     let free = (cluster - stick - 2.0 * PANEL_MARGIN).max(0.0);
     let columns = ((free + BUTTON_GAP) / (D_SMALL + BUTTON_GAP))
         .floor()
         .clamp(PANEL_COLS_MIN as f32, PANEL_COLS as f32) as usize;
-    let rows = CONTEXT_SLOTS.div_ceil(columns);
+    let rows = slots.div_ceil(columns);
     let row_pitch = (PANEL_ROW_BOTTOM - PANEL_ROW_TOP) / (rows - 1).max(1) as f32;
     let row_pitch = row_pitch.min(PANEL_ROW_PITCH);
     // Buttons give up size before they give up the gap, across and down.
@@ -436,15 +532,40 @@ struct Placement {
 }
 
 /// Lane and row of a context action, or `None` if it is not offered right now.
-fn context_slot(slot: usize, expanded: bool, aspect: f32) -> Option<Placement> {
+fn context_slot(slot: usize, expanded: bool, aspect: f32, grid_slots: usize) -> Option<Placement> {
     if !expanded {
         return Some(Placement {
-            lane: LANE_CONTEXT,
+            lane: context_lane(aspect),
             row: *TIER_ROWS.get(slot)?,
             diameter: D_SMALL,
         });
     }
-    let grid = grid(aspect);
+    if slot >= grid_slots {
+        return None;
+    }
+    if aspect < NARROW_GRID_MAX_ASPECT {
+        // A square split-screen pane has no horizontal room for the standard
+        // panel alongside the context column. Stack six buttons in each of
+        // two narrow lanes, with the anchored column between them and combat.
+        let rows = grid_slots.div_ceil(2);
+        let column = slot / rows;
+        let row = slot % rows;
+        let diameter = NARROW_GRID_DIAMETER;
+        let context_center = aspect - context_lane(aspect);
+        let stick_edge = STICK_X * aspect + D_STICK / 2.0;
+        let from_left = match column {
+            0 => stick_edge + diameter / 2.0 + PANEL_MARGIN,
+            1 => context_center + D_SMALL / 2.0 + diameter / 2.0 + PANEL_MARGIN,
+            _ => return None,
+        };
+        let row_pitch = (PANEL_ROW_BOTTOM - PANEL_ROW_TOP) / (rows - 1).max(1) as f32;
+        return Some(Placement {
+            lane: aspect - from_left,
+            row: PANEL_ROW_TOP + row as f32 * row_pitch,
+            diameter,
+        });
+    }
+    let grid = grid(aspect, grid_slots);
     let column = slot % grid.columns;
     let row = slot / grid.columns;
     // The grid is measured from the left, lanes from the right.
@@ -467,19 +588,49 @@ pub fn shown(
     localize: impl Fn(&str) -> String,
 ) -> Vec<Shown> {
     let mut shown = Vec::with_capacity(COUNT);
-    shown.push(Shown {
-        index: 0,
-        action: None,
-        center: Vec2::new(STICK_X, STICK_Y),
-        diameter: D_STICK,
-        label: localize("hud-touch-move"),
-        active: false,
-    });
+    if !ctx.dead {
+        shown.push(Shown {
+            index: 0,
+            action: None,
+            center: Vec2::new(STICK_X, STICK_Y),
+            diameter: D_STICK,
+            label: localize("hud-touch-move"),
+            active: false,
+        });
+    }
     for (offset, button) in FIXED.iter().enumerate() {
+        // Death leaves menu access, More for chat, and the dedicated respawn
+        // control; hide movement, hotbar, gameplay and combat controls.
+        if ctx.dead
+            && !matches!(
+                button.action,
+                Some(Kind::Input(
+                    GameInput::Inventory | GameInput::Diary | GameInput::Escape
+                )) | Some(Kind::More)
+            )
+        {
+            continue;
+        }
+        // Interact is useful only while a live character has something in
+        // range; keep its widget id stable when it is hidden.
+        if matches!(button.action, Some(Kind::Input(GameInput::Interact)))
+            && (!ctx.controlling || ctx.dead || !ctx.has_interactable)
+        {
+            continue;
+        }
+        let lane = if aspect < NARROW_GRID_MAX_ASPECT
+            && matches!(
+                button.action,
+                Some(Kind::Input(GameInput::Secondary | GameInput::Roll))
+            ) {
+            LANE_INNER_NARROW
+        } else {
+            button.lane
+        };
         shown.push(Shown {
             index: offset + 1,
             action: button.action,
-            center: center_of(button.lane, button.row, aspect),
+            center: center_of(button.side, lane, button.row, aspect),
             diameter: button.diameter,
             label: match button.label {
                 Label::Key(key) => localize(key),
@@ -489,17 +640,44 @@ pub fn shown(
             active: matches!(button.action, Some(Kind::More)) && expanded,
         });
     }
+    // The most-used actions keep the same three positions whether More is
+    // open or closed. The expanded grid contains only the remaining context
+    // actions; narrow panes use compact vertical lanes instead of moving them.
+    let mut tier_slot = 0;
     for spec in layout(ctx) {
         if !spec.enabled {
             continue;
         }
-        let Some(placement) = context_slot(spec.slot, expanded, aspect) else {
+        let placement = if spec.kind == Kind::Input(GameInput::ToggleChat) {
+            if !expanded {
+                continue;
+            }
+            context_slot(0, true, aspect, EXPANDED_GRID_SLOTS)
+        } else if !expanded {
+            if tier_slot >= TIER_SLOTS {
+                continue;
+            }
+            let slot = tier_slot;
+            tier_slot += 1;
+            context_slot(slot, false, aspect, CONTEXT_SLOTS)
+        } else if tier_slot < TIER_SLOTS {
+            let slot = tier_slot;
+            tier_slot += 1;
+            context_slot(slot, false, aspect, CONTEXT_SLOTS)
+        } else {
+            // Slots below TIER_SLOTS are always among the first enabled
+            // actions. Keep the remaining actions at their stable grid slots,
+            // leaving disabled entries empty instead of shifting their peers.
+            let slot = spec.slot - TIER_SLOTS;
+            context_slot(slot, true, aspect, EXPANDED_GRID_SLOTS)
+        };
+        let Some(placement) = placement else {
             continue;
         };
         shown.push(Shown {
             index: 1 + FIXED.len() + spec.slot,
             action: Some(spec.kind),
-            center: center_of(placement.lane, placement.row, aspect),
+            center: center_of(Side::Right, placement.lane, placement.row, aspect),
             diameter: placement.diameter,
             label: localize(spec.label_key),
             active: spec.active,
@@ -528,7 +706,7 @@ pub fn regions(shown: &[Shown]) -> Vec<Region> {
             button.action.map(|action| Region {
                 action,
                 center: button.center,
-                radius: button.diameter / 2.0,
+                half_extent: button.diameter / 2.0,
             })
         })
         .collect()
@@ -566,12 +744,20 @@ mod tests {
     fn full_context() -> Context {
         Context {
             controlling: true,
+            chat_visible: false,
             riding: false,
+            has_mount_target: true,
+            has_trade_target: true,
+            has_stay_follow_target: true,
+            pet_staying: false,
+            trading: false,
             wielding: true,
             gliding: false,
             has_glider: true,
             has_lantern: true,
             lantern_on: true,
+            is_dark: true,
+            has_interactable: true,
             sneaking: true,
             sitting: true,
             crawling: true,
@@ -581,9 +767,7 @@ mod tests {
         }
     }
 
-    /// The state the player is in after dying. Everything is left available on
-    /// purpose: the context actions have to stay out of the way of the respawn
-    /// button even in a state the HUD would never ask for.
+    /// The state the player is in after dying: menus and More remain for Chat.
     fn dead_context() -> Context {
         Context {
             dead: true,
@@ -591,9 +775,21 @@ mod tests {
         }
     }
 
-    /// Every state the overlay is drawn in.
-    fn contexts() -> [(&'static str, Context); 2] {
-        [("alive", full_context()), ("dead", dead_context())]
+    /// Representative states the overlay is drawn in.
+    fn contexts() -> [(&'static str, Context); 3] {
+        let mut no_nearby_targets = full_context();
+        no_nearby_targets.has_mount_target = false;
+        no_nearby_targets.has_trade_target = false;
+        no_nearby_targets.has_stay_follow_target = false;
+        no_nearby_targets.wielding = false;
+        no_nearby_targets.has_lantern = false;
+        no_nearby_targets.lantern_on = false;
+        no_nearby_targets.is_dark = false;
+        [
+            ("alive", full_context()),
+            ("no nearby targets", no_nearby_targets),
+            ("dead", dead_context()),
+        ]
     }
 
     /// Every button on screen, in screen-height units: `(index, x, y, radius)`.
@@ -608,13 +804,295 @@ mod tests {
     fn assert_apart(buttons: &[(usize, f32, f32, f32)], state: &str) {
         for (i, &(index, x, y, radius)) in buttons.iter().enumerate() {
             for &(other, x2, y2, radius2) in &buttons[i + 1..] {
-                let gap = ((x - x2).powi(2) + (y - y2).powi(2)).sqrt() - radius - radius2;
+                let half_extents = radius + radius2;
+                let dx = (x - x2).abs();
+                let dy = (y - y2).abs();
+                let gap = (dx.powi(2) + dy.powi(2)).sqrt() - half_extents;
                 assert!(
                     gap >= MIN_GAP,
                     "slots {index}/{other} gap {gap:.4}h in {state}",
                 );
+                assert!(
+                    dx >= half_extents || dy >= half_extents,
+                    "slots {index}/{other} square hit regions overlap in {state}",
+                );
             }
         }
+    }
+
+    fn has_input(buttons: &[Shown], input: GameInput) -> bool {
+        buttons
+            .iter()
+            .any(|button| matches!(button.action, Some(Kind::Input(action)) if action == input))
+    }
+
+    fn input_button(buttons: &[Shown], input: GameInput) -> &Shown {
+        buttons
+            .iter()
+            .find(|button| matches!(button.action, Some(Kind::Input(action)) if action == input))
+            .unwrap_or_else(|| panic!("missing {input:?} button"))
+    }
+
+    #[test]
+    fn lantern_is_offered_only_when_dark_or_already_on() {
+        let mut ctx = full_context();
+        ctx.is_dark = false;
+        ctx.lantern_on = false;
+        let bright = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        assert!(!has_input(&bright, GameInput::ToggleLantern));
+
+        ctx.is_dark = true;
+        let dark = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        assert!(has_input(&dark, GameInput::ToggleLantern));
+
+        ctx.is_dark = false;
+        ctx.lantern_on = true;
+        let already_on = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        assert!(has_input(&already_on, GameInput::ToggleLantern));
+
+        ctx.has_lantern = false;
+        ctx.lantern_on = false;
+        ctx.is_dark = true;
+        let no_lantern = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        assert!(!has_input(&no_lantern, GameInput::ToggleLantern));
+    }
+
+    #[test]
+    fn interact_is_offered_only_for_a_live_player_with_a_target() {
+        let mut ctx = full_context();
+        ctx.has_interactable = false;
+        let no_target = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        assert!(!has_input(&no_target, GameInput::Interact));
+
+        ctx.has_interactable = true;
+        let in_range = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        assert!(has_input(&in_range, GameInput::Interact));
+
+        ctx.dead = true;
+        let dead = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        assert!(!has_input(&dead, GameInput::Interact));
+    }
+
+    #[test]
+    fn nearby_mount_trade_and_pet_actions_are_dynamic_and_tappable() {
+        let mut ctx = full_context();
+        ctx.has_mount_target = false;
+        ctx.has_trade_target = false;
+        ctx.has_stay_follow_target = false;
+        let no_targets = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        for input in [GameInput::Mount, GameInput::Trade, GameInput::StayFollow] {
+            assert!(
+                !has_input(&no_targets, input),
+                "unexpected {input:?} button"
+            );
+        }
+
+        ctx.has_mount_target = true;
+        ctx.has_trade_target = true;
+        ctx.has_stay_follow_target = true;
+        let nearby = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        let tap_regions = regions(&nearby);
+        for input in [GameInput::Mount, GameInput::Trade, GameInput::StayFollow] {
+            let button = nearby
+                .iter()
+                .find(
+                    |button| matches!(button.action, Some(Kind::Input(action)) if action == input),
+                )
+                .unwrap_or_else(|| panic!("missing {input:?} button"));
+            let region = tap_regions
+                .iter()
+                .find(|region| matches!(region.action, Kind::Input(action) if action == input))
+                .unwrap_or_else(|| panic!("{input:?} is drawn without a matching tap region"));
+            assert_eq!(region.center, button.center);
+            assert_eq!(region.half_extent, button.diameter / 2.0);
+        }
+
+        // Nearby interactions take the three always-visible context slots.
+        let tier: Vec<_> = nearby
+            .iter()
+            .filter(|button| {
+                button.index > FIXED.len() && button.index <= FIXED.len() + CONTEXT_SLOTS
+            })
+            .filter_map(|button| match button.action {
+                Some(Kind::Input(input)) => Some(input),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            tier,
+            vec![GameInput::Mount, GameInput::Trade, GameInput::StayFollow],
+            "nearby interactions should not be hidden behind More",
+        );
+        let nearby_expanded = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        for input in [GameInput::Mount, GameInput::Trade, GameInput::StayFollow] {
+            assert_eq!(
+                input_button(&nearby_expanded, input).center,
+                input_button(&nearby, input).center,
+                "nearby {input:?} moved when More opened",
+            );
+        }
+
+        // Mount remains available as a dismount action while already riding.
+        ctx.riding = true;
+        ctx.has_mount_target = false;
+        let riding = layout(&ctx);
+        let mount = riding
+            .iter()
+            .find(|spec| spec.kind == Kind::Input(GameInput::Mount))
+            .expect("mount slot");
+        assert!(mount.enabled && mount.active);
+        assert_eq!(mount.label_key, "hud-unmount");
+
+        // The pet toggle's text describes the action it will perform.
+        ctx.pet_staying = true;
+        let staying = layout(&ctx);
+        let stay_follow = staying
+            .iter()
+            .find(|spec| spec.kind == Kind::Input(GameInput::StayFollow))
+            .expect("stay/follow slot");
+        assert!(stay_follow.active);
+        assert_eq!(stay_follow.label_key, "hud-follow");
+
+        // The trade input is not accepted while a trade is already underway.
+        // Keep the player on foot so the Glide/Sneak checks exercise the
+        // trading gate rather than their separate riding gate.
+        ctx.riding = false;
+        ctx.trading = false;
+        let not_trading = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        assert!(has_input(&not_trading, GameInput::Glide));
+        assert!(has_input(&not_trading, GameInput::Sneak));
+
+        ctx.trading = true;
+        let trading = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        assert!(!has_input(&trading, GameInput::Trade));
+        assert!(!has_input(&trading, GameInput::Glide));
+        assert!(!has_input(&trading, GameInput::Sneak));
+    }
+
+    #[test]
+    fn opening_more_keeps_visible_context_buttons_in_place() {
+        let mut ctx = full_context();
+        ctx.has_mount_target = false;
+        ctx.has_trade_target = false;
+        ctx.has_stay_follow_target = false;
+        ctx.wielding = false;
+        ctx.has_lantern = false;
+        ctx.lantern_on = false;
+        ctx.is_dark = false;
+
+        // Glide is one of the three visible actions in this state. More must
+        // reveal the extra grid without reflowing it or the other visible ones.
+        for aspect in ASPECTS {
+            let closed = shown(&ctx, false, aspect, str::to_owned);
+            let open = shown(&ctx, true, aspect, str::to_owned);
+            for input in [GameInput::ToggleWield, GameInput::Glide, GameInput::Sneak] {
+                let closed_button = input_button(&closed, input);
+                let open_button = input_button(&open, input);
+                assert_eq!(
+                    open_button.center, closed_button.center,
+                    "{input:?} moved when More opened at aspect {aspect:.2}",
+                );
+                assert_eq!(
+                    open_button.diameter, closed_button.diameter,
+                    "{input:?} changed size when More opened at aspect {aspect:.2}",
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn chat_toggle_only_appears_in_the_expanded_grid() {
+        let mut ctx = full_context();
+        let closed = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        assert!(!has_input(&closed, GameInput::ToggleChat));
+
+        let expanded = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        let chat = input_button(&expanded, GameInput::ToggleChat);
+        let first_grid_slot = context_slot(0, true, 16.0 / 9.0, EXPANDED_GRID_SLOTS)
+            .expect("first expanded-grid slot");
+        assert_eq!(
+            chat.center,
+            center_of(
+                Side::Right,
+                first_grid_slot.lane,
+                first_grid_slot.row,
+                16.0 / 9.0,
+            ),
+        );
+        assert_eq!(chat.label, "hud-touch-chat");
+        assert!(!chat.active);
+
+        // It stays in the grid even when the usual nearby actions are absent.
+        ctx.has_mount_target = false;
+        ctx.has_trade_target = false;
+        ctx.has_stay_follow_target = false;
+        let no_targets = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        assert_eq!(
+            input_button(&no_targets, GameInput::ToggleChat).center,
+            chat.center
+        );
+
+        ctx.chat_visible = true;
+        let visible = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        assert!(input_button(&visible, GameInput::ToggleChat).active);
+        assert!(!has_input(
+            &shown(&ctx, false, 16.0 / 9.0, str::to_owned),
+            GameInput::ToggleChat,
+        ));
+    }
+
+    #[test]
+    fn touch_regions_match_the_drawn_square() {
+        let buttons = shown(&full_context(), true, 16.0 / 9.0, str::to_owned);
+        let glide = input_button(&buttons, GameInput::Glide);
+        let region = regions(&buttons)
+            .into_iter()
+            .find(|region| region.action == Kind::Input(GameInput::Glide))
+            .expect("Glide button has no touch region");
+        let width = 1920.0;
+        let height = 1080.0;
+        let center = Vec2::new(glide.center.x * width, glide.center.y * height);
+        let half_extent = glide.diameter * height / 2.0;
+
+        // This diagonal point is inside the visual square but outside the old
+        // circular hit region, so it must still reach the button, not movement.
+        let square_corner = center + Vec2::new(half_extent * 0.9, half_extent * 0.9);
+        assert!(region.contains(square_corner, width, height));
+        let outside = center + Vec2::new(half_extent * 1.01, 0.0);
+        assert!(!region.contains(outside, width, height));
+    }
+
+    #[test]
+    fn menu_and_hotbar_buttons_are_clear_of_the_top_right_minimap() {
+        let buttons = shown(&full_context(), false, 1.0, str::to_owned);
+        // At aspect 1, this leaves a small buffer before a top-right minimap at
+        // its largest setting (scale 2.0).
+        let clear_of_minimap = |input| {
+            let button = buttons
+                .iter()
+                .find(
+                    |button| matches!(button.action, Some(Kind::Input(action)) if action == input),
+                )
+                .expect("expected fixed button");
+            button.center.x + button.diameter / 2.0 <= 0.67
+        };
+        for input in [
+            GameInput::Inventory,
+            GameInput::Diary,
+            GameInput::Escape,
+            GameInput::Slot1,
+            GameInput::Slot2,
+            GameInput::Slot3,
+            GameInput::Slot4,
+            GameInput::Slot5,
+        ] {
+            assert!(clear_of_minimap(input), "{input:?} overlaps the minimap");
+        }
+        let more = buttons
+            .iter()
+            .find(|button| matches!(button.action, Some(Kind::More)))
+            .expect("expected More button");
+        assert!(more.center.x + more.diameter / 2.0 <= 0.67);
     }
 
     #[test]
@@ -626,6 +1104,23 @@ mod tests {
                     let state = format!("{name} at {aspect:.2} open={expanded}");
                     assert_apart(&buttons, &state);
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn expanded_context_stays_clear_of_the_bottom_hotbar() {
+        const HOTBAR_CLEARANCE: f32 = 0.92;
+        for aspect in ASPECTS {
+            let buttons = shown(&full_context(), true, aspect, str::to_owned);
+            for button in buttons.iter().filter(|button| {
+                button.index > FIXED.len() && button.index <= FIXED.len() + CONTEXT_SLOTS
+            }) {
+                assert!(
+                    button.center.y + button.diameter / 2.0 <= HOTBAR_CLEARANCE,
+                    "context slot {} overlaps the bottom hotbar at aspect {aspect:.2}",
+                    button.index,
+                );
             }
         }
     }
@@ -667,8 +1162,38 @@ mod tests {
             .iter()
             .any(|region| matches!(region.action, Kind::Input(GameInput::Respawn)));
         assert!(tappable, "the respawn button has no region to tap");
-        // Nothing that needs a living character is offered alongside it.
-        assert_eq!(drawn.len(), 1 + FIXED.len() + 1, "dead but not quiet");
+        // Keep menus and More (to reach Chat), but hide the movement stick,
+        // hotbar, gameplay actions and combat cluster while dead.
+        assert_eq!(
+            drawn.len(),
+            5,
+            "dead HUD should keep menus, More and respawn"
+        );
+        assert!(!has_input(&drawn, GameInput::ToggleChat));
+        assert!(
+            drawn
+                .iter()
+                .any(|button| matches!(button.action, Some(Kind::More)))
+        );
+        assert!(has_input(
+            &shown(&dead_context(), true, 16.0 / 9.0, str::to_owned),
+            GameInput::ToggleChat,
+        ));
+        for input in [GameInput::Inventory, GameInput::Diary, GameInput::Escape] {
+            assert!(
+                has_input(&drawn, input),
+                "dead HUD lost menu action {input:?}"
+            );
+        }
+        for input in [
+            GameInput::Slot1,
+            GameInput::Jump,
+            GameInput::Primary,
+            GameInput::Secondary,
+            GameInput::Roll,
+        ] {
+            assert!(!has_input(&drawn, input), "dead HUD still offers {input:?}");
+        }
     }
 
     #[test]

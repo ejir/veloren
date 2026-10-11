@@ -7,7 +7,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 pub const MAX_CHAT_TABS: usize = 5;
+
+/// Keep the chat overlay more compact by default on Android phones.
+#[cfg(target_os = "android")]
+pub const DEFAULT_CHAT_BOX_WIDTH: f64 = 360.0;
+#[cfg(not(target_os = "android"))]
 pub const DEFAULT_CHAT_BOX_WIDTH: f64 = 470.0;
+
+#[cfg(target_os = "android")]
+pub const DEFAULT_CHAT_BOX_HEIGHT: f64 = 120.0;
+#[cfg(not(target_os = "android"))]
 pub const DEFAULT_CHAT_BOX_HEIGHT: f64 = 150.0;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -99,5 +108,19 @@ impl Default for ChatSettings {
             chat_size_y: DEFAULT_CHAT_BOX_HEIGHT,
             show_chat_timestamp: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_chat_box_size_is_compact_on_android_and_unchanged_elsewhere() {
+        let settings = ChatSettings::default();
+        #[cfg(target_os = "android")]
+        assert_eq!((settings.chat_size_x, settings.chat_size_y), (360.0, 120.0));
+        #[cfg(not(target_os = "android"))]
+        assert_eq!((settings.chat_size_x, settings.chat_size_y), (470.0, 150.0));
     }
 }
