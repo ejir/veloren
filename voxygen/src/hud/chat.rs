@@ -102,8 +102,12 @@ const CHAT_TAB_ALL_WIDTH: f64 = 40.0;
 
 fn compact_mobile_chat_size(default_size: Vec2<f64>, window_size: Vec2<f64>) -> Vec2<f64> {
     Vec2::new(
-        default_size.x.min(window_size.x * MOBILE_CHAT_WIDTH_FRACTION),
-        default_size.y.min(window_size.y * MOBILE_CHAT_HEIGHT_FRACTION),
+        default_size
+            .x
+            .min(window_size.x * MOBILE_CHAT_WIDTH_FRACTION),
+        default_size
+            .y
+            .min(window_size.y * MOBILE_CHAT_HEIGHT_FRACTION),
     )
 }
 
