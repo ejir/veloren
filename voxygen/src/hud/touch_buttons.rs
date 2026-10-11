@@ -236,7 +236,8 @@ const PANEL_SPACING_MAX: f32 = 0.30;
 const PANEL_D_MIN: f32 = 0.06;
 /// First row of the standard grid; keep it below the chat toggle under More.
 const PANEL_ROW_TOP: f32 = 0.405;
-/// Compact grids have smaller buttons and need less clearance from the chat toggle.
+/// Compact grids have smaller buttons and need less clearance from the chat
+/// toggle.
 const NARROW_PANEL_ROW_TOP: f32 = 0.37;
 /// Leave a clear strip above the game's centered bottom hotbar.
 const PANEL_ROW_BOTTOM: f32 = 0.85;
@@ -1026,7 +1027,10 @@ mod tests {
         assert!(!chat.active);
 
         let expanded = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
-        assert_eq!(input_button(&expanded, GameInput::ToggleChat).center, chat.center);
+        assert_eq!(
+            input_button(&expanded, GameInput::ToggleChat).center,
+            chat.center
+        );
 
         ctx.chat_visible = true;
         let visible = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
