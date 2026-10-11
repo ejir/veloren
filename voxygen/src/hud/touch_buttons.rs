@@ -94,8 +94,8 @@ pub struct Spec {
 }
 
 /// The context actions, in slot order. Nearby interactions stay visible without
-/// More; the chat toggle leads the expanded actions, followed by combat, toggles
-/// and emotes, and finally the camera.
+/// More; the chat toggle leads the expanded actions, followed by combat,
+/// toggles and emotes, and finally the camera.
 ///
 /// Whether an action is offered at all comes from [`state_of`], which keeps
 /// this a plain list.
@@ -1170,7 +1170,11 @@ mod tests {
             "dead HUD should keep menus, More and respawn"
         );
         assert!(!has_input(&drawn, GameInput::ToggleChat));
-        assert!(drawn.iter().any(|button| matches!(button.action, Some(Kind::More))));
+        assert!(
+            drawn
+                .iter()
+                .any(|button| matches!(button.action, Some(Kind::More)))
+        );
         assert!(has_input(
             &shown(&dead_context(), true, 16.0 / 9.0, str::to_owned),
             GameInput::ToggleChat,
