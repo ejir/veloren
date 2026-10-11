@@ -70,7 +70,7 @@ impl Default for InterfaceSettings {
             toggle_debug: false,
             toggle_egui_debug: false,
             toggle_hitboxes: false,
-            toggle_chat: true,
+            toggle_chat: !cfg!(target_os = "android"),
             slots_use_prefixes: true,
             slots_prefix_switch_point: 5,
             sct: true,
@@ -127,4 +127,21 @@ impl Default for InterfaceSettings {
 #[cfg(feature = "egui-ui")]
 impl InterfaceSettings {
     pub fn egui_enabled(&self) -> bool { self.toggle_egui_debug }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::InterfaceSettings;
+
+    #[cfg(target_os = "android")]
+    #[test]
+    fn chat_is_hidden_by_default_on_android() {
+        assert!(!InterfaceSettings::default().toggle_chat);
+    }
+
+    #[cfg(not(target_os = "android"))]
+    #[test]
+    fn chat_remains_visible_by_default_off_android() {
+        assert!(InterfaceSettings::default().toggle_chat);
+    }
 }
