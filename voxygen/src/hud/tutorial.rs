@@ -90,6 +90,29 @@ pub enum Achievement {
 impl Hint {
     const FADE_TIME: f32 = 5.0;
 
+    fn has_key_prompt(&self) -> bool {
+        matches!(
+            self,
+            Self::Move
+                | Self::Jump
+                | Self::OpenInventory
+                | Self::FallDamage
+                | Self::OpenGlider
+                | Self::Roll
+                | Self::Attacked
+                | Self::Unwield
+                | Self::Campfire
+                | Self::OpenDiary
+                | Self::RecipeAvailable
+                | Self::Chat
+                | Self::Sneak
+                | Self::Lantern
+                | Self::Zoom
+                | Self::Swim
+                | Self::OpenMap
+        )
+    }
+
     fn get_msg<'a>(
         &self,
         settings: &Settings,
@@ -571,10 +594,24 @@ impl Widget for Tutorial<'_> {
         self.global_state.profile.tutorial.update(self.dt);
         self.global_state.profile.tutorial.event_tick(self.client);
 
-        // Touch controls replace keyboard/controller instructions on Android;
-        // keep tutorial progression running without showing its hint toasts.
+        // Touch controls replace generic key prompts on Android. Keep the
+        // campfire prompt, which explains how to set a respawn waypoint, and
+        // continue showing tutorial notices that do not require a key.
         if cfg!(target_os = "android") {
-            return;
+            let show_hint = self
+                .global_state
+                .profile
+                .tutorial
+                .current
+                .as_ref()
+                .is_some_and(|(hint, _, _)| !hint.has_key_prompt() || *hint == Hint::Campfire);
+            if !show_hint {
+                // Hidden toasts still need to expire so queued notices progress.
+                if let Some((_, _, anim)) = &mut self.global_state.profile.tutorial.current {
+                    *anim += self.dt;
+                }
+                return;
+            }
         }
 
         let mut old = Vec::new();
