@@ -1413,6 +1413,12 @@ impl Hud {
         persisted_state: Rc<RefCell<PersistedHudState>>,
         client: &Client,
     ) -> Self {
+        #[cfg(target_os = "android")]
+        {
+            // Start each mobile session with chat collapsed; the touch button
+            // below More is the on-screen way to open it.
+            global_state.settings.interface.toggle_chat = false;
+        }
         let window = &mut global_state.window;
         let settings = &global_state.settings;
 
@@ -1669,6 +1675,8 @@ impl Hud {
                     let ctx = touch_buttons::Context {
                         controlling: char_state.is_some()
                             && healths.get(me).is_some_and(|h| !h.is_dead),
+                        chat_visible: global_state.settings.interface.toggle_chat
+                            || self.force_chat,
                         riding: client.is_riding(),
                         has_mount_target,
                         has_trade_target,
@@ -4782,7 +4790,7 @@ impl Hud {
             .settings
             .controls
             .get_binding(GameInput::ToggleCursor)
-            .filter(|_| !show_intro)
+            .filter(|_| !show_intro && !cfg!(target_os = "android"))
         {
             prof_span!("temporary example quest");
             match global_state.settings.interface.intro_show {
@@ -5143,6 +5151,17 @@ impl Hud {
                 self.force_ungrab = !self.force_ungrab;
                 true
             },
+            #[cfg(target_os = "android")]
+            WinEvent::InputUpdate(GameInput::ToggleChat, true) => {
+                let chat_was_visible =
+                    global_state.settings.interface.toggle_chat || self.force_chat;
+                global_state.settings.interface.toggle_chat = !chat_was_visible;
+                if chat_was_visible {
+                    self.ui.focus_widget(None);
+                    self.force_chat = false;
+                }
+                true
+            },
             WinEvent::InputUpdate(GameInput::AcceptGroupInvite, true) if !self.typing() => {
                 if let Some(prompt_dialog) = &mut self.show.prompt_dialog {
                     prompt_dialog.set_outcome_via_keypress(true);
@@ -5291,6 +5310,7 @@ impl Hud {
                             !global_state.settings.interface.toggle_egui_debug;
                         true
                     },
+                    #[cfg(not(target_os = "android"))]
                     GameInput::ToggleChat if state => {
                         global_state.settings.interface.toggle_chat =
                             !global_state.settings.interface.toggle_chat;

@@ -45,6 +45,8 @@ pub enum Kind {
 pub struct Context {
     /// The player has a living character that can take actions.
     pub controlling: bool,
+    /// The chat panel is currently visible.
+    pub chat_visible: bool,
     pub riding: bool,
     /// A mountable entity or block is in interaction range.
     pub has_mount_target: bool,
@@ -193,6 +195,7 @@ const D_MENU: f32 = 0.085;
 /// Rows, as fractions of the screen height measured from the top.
 const ROW_MENU: f32 = 0.055;
 const ROW_SLOT: f32 = 0.175;
+const ROW_CHAT: f32 = 0.27;
 const ROW_HIGH: f32 = 0.395;
 const ROW_MID: f32 = 0.585;
 const ROW_LOW: f32 = 0.80;
@@ -231,9 +234,10 @@ const PANEL_SPACING_MAX: f32 = 0.30;
 /// Smallest a grid button shrinks to. Only reached in windows narrower than
 /// anything the Android build can be given.
 const PANEL_D_MIN: f32 = 0.06;
-/// First row of the grid, how far down it may reach, and the row pitch it
-/// prefers when there is room for it.
-const PANEL_ROW_TOP: f32 = 0.32;
+/// First row of the standard grid; keep it below the chat toggle under More.
+const PANEL_ROW_TOP: f32 = 0.405;
+/// Compact grids have smaller buttons and need less clearance from the chat toggle.
+const NARROW_PANEL_ROW_TOP: f32 = 0.37;
 /// Leave a clear strip above the game's centered bottom hotbar.
 const PANEL_ROW_BOTTOM: f32 = 0.85;
 const PANEL_ROW_PITCH: f32 = 0.16;
@@ -295,7 +299,7 @@ struct Fixed {
 }
 
 /// Fixed-position buttons, in rows from the top of the screen down.
-const FIXED: [Fixed; 14] = [
+const FIXED: [Fixed; 15] = [
     // Menu row. Settings is left out on purpose: the menu button opens the
     // escape menu, which has it.
     Fixed {
@@ -373,6 +377,15 @@ const FIXED: [Fixed; 14] = [
         side: Side::Left,
         lane: 0.58,
         row: ROW_MENU,
+        diameter: D_MENU,
+    },
+    // Chat is hidden by default on phones; keep its toggle directly below More.
+    Fixed {
+        action: Some(Kind::Input(GameInput::ToggleChat)),
+        label: Label::Key("hud-touch-chat"),
+        side: Side::Left,
+        lane: 0.58,
+        row: ROW_CHAT,
         diameter: D_MENU,
     },
     // Combat cluster: the attack button on the edge lane, the rest around it.
@@ -554,10 +567,10 @@ fn context_slot(slot: usize, expanded: bool, aspect: f32, grid_slots: usize) -> 
             1 => context_center + D_SMALL / 2.0 + diameter / 2.0 + PANEL_MARGIN,
             _ => return None,
         };
-        let row_pitch = (PANEL_ROW_BOTTOM - PANEL_ROW_TOP) / (rows - 1).max(1) as f32;
+        let row_pitch = (PANEL_ROW_BOTTOM - NARROW_PANEL_ROW_TOP) / (rows - 1).max(1) as f32;
         return Some(Placement {
             lane: aspect - from_left,
-            row: PANEL_ROW_TOP + row as f32 * row_pitch,
+            row: NARROW_PANEL_ROW_TOP + row as f32 * row_pitch,
             diameter,
         });
     }
@@ -601,7 +614,10 @@ pub fn shown(
             && !matches!(
                 button.action,
                 Some(Kind::Input(
-                    GameInput::Inventory | GameInput::Diary | GameInput::Escape
+                    GameInput::Inventory
+                        | GameInput::Diary
+                        | GameInput::Escape
+                        | GameInput::ToggleChat
                 ))
             )
         {
@@ -633,7 +649,11 @@ pub fn shown(
                 Label::Symbol(symbol) => symbol.to_owned(),
                 Label::Toggle { closed, open } => localize(if expanded { open } else { closed }),
             },
-            active: matches!(button.action, Some(Kind::More)) && expanded,
+            active: match button.action {
+                Some(Kind::More) => expanded,
+                Some(Kind::Input(GameInput::ToggleChat)) => ctx.chat_visible,
+                _ => false,
+            },
         });
     }
     // The most-used actions keep the same three positions whether More is
@@ -735,6 +755,7 @@ mod tests {
     fn full_context() -> Context {
         Context {
             controlling: true,
+            chat_visible: false,
             riding: false,
             has_mount_target: true,
             has_trade_target: true,
@@ -991,6 +1012,28 @@ mod tests {
     }
 
     #[test]
+    fn chat_toggle_stays_below_more_and_tracks_visibility() {
+        let mut ctx = full_context();
+        let closed = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        let more = closed
+            .iter()
+            .find(|button| matches!(button.action, Some(Kind::More)))
+            .expect("expected More button");
+        let chat = input_button(&closed, GameInput::ToggleChat);
+        assert_eq!(chat.center.x, more.center.x);
+        assert!(chat.center.y > more.center.y);
+        assert_eq!(chat.label, "hud-touch-chat");
+        assert!(!chat.active);
+
+        let expanded = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        assert_eq!(input_button(&expanded, GameInput::ToggleChat).center, chat.center);
+
+        ctx.chat_visible = true;
+        let visible = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        assert!(input_button(&visible, GameInput::ToggleChat).active);
+    }
+
+    #[test]
     fn touch_regions_match_the_drawn_square() {
         let buttons = shown(&full_context(), true, 16.0 / 9.0, str::to_owned);
         let glide = input_button(&buttons, GameInput::Glide);
@@ -1034,6 +1077,7 @@ mod tests {
             GameInput::Slot3,
             GameInput::Slot4,
             GameInput::Slot5,
+            GameInput::ToggleChat,
         ] {
             assert!(clear_of_minimap(input), "{input:?} overlaps the minimap");
         }
@@ -1111,13 +1155,14 @@ mod tests {
             .iter()
             .any(|region| matches!(region.action, Kind::Input(GameInput::Respawn)));
         assert!(tappable, "the respawn button has no region to tap");
-        // Keep the three menu buttons, but hide the movement stick, hotbar,
+        // Keep menus and the chat toggle, but hide the movement stick, hotbar,
         // context actions and combat cluster while dead.
         assert_eq!(
             drawn.len(),
-            4,
-            "dead HUD should only have menus and respawn"
+            5,
+            "dead HUD should only have menus, chat and respawn"
         );
+        assert!(has_input(&drawn, GameInput::ToggleChat));
         for input in [GameInput::Inventory, GameInput::Diary, GameInput::Escape] {
             assert!(
                 has_input(&drawn, input),

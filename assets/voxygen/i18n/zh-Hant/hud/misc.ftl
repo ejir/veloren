@@ -109,3 +109,4 @@ hud-touch-greet = 招呼
 hud-touch-respawn = 重生
 hud-touch-more = 更多
 hud-touch-less = 收起
+hud-touch-chat = 聊天

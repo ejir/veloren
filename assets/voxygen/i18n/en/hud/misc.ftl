@@ -145,3 +145,4 @@ hud-touch-greet = Greet
 hud-touch-respawn = Respawn
 hud-touch-more = More
 hud-touch-less = Less
+hud-touch-chat = Chat
