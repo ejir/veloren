@@ -1415,8 +1415,8 @@ impl Hud {
     ) -> Self {
         #[cfg(target_os = "android")]
         {
-            // Start each mobile session with chat collapsed; the touch button
-            // below More is the on-screen way to open it.
+            // Start each mobile session with chat collapsed; its touch toggle
+            // is in More's expanded controls.
             global_state.settings.interface.toggle_chat = false;
         }
         let window = &mut global_state.window;

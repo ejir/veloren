@@ -93,9 +93,9 @@ pub struct Spec {
     pub slot: usize,
 }
 
-/// The context actions, in slot order. Nearby interactions come first so they
-/// are visible without opening "More"; then come combat, toggles and emotes,
-/// and finally the camera.
+/// The context actions, in slot order. Nearby interactions stay visible without
+/// More; the chat toggle leads the expanded actions, followed by combat, toggles
+/// and emotes, and finally the camera.
 ///
 /// Whether an action is offered at all comes from [`state_of`], which keeps
 /// this a plain list.
@@ -103,6 +103,7 @@ const ACTIONS: [(GameInput, &str); CONTEXT_SLOTS] = [
     (GameInput::Mount, "hud-mount"),
     (GameInput::Trade, "hud-trade"),
     (GameInput::StayFollow, "hud-stay"),
+    (GameInput::ToggleChat, "hud-touch-chat"),
     (GameInput::ToggleWield, "hud-touch-draw"),
     (GameInput::Block, "hud-touch-block"),
     (GameInput::ToggleLantern, "hud-touch-lantern"),
@@ -164,6 +165,7 @@ fn state_of(ctx: &Context, input: GameInput) -> (bool, bool) {
             ctx.pet_staying,
             ctx.controlling && !ctx.dead && ctx.has_stay_follow_target,
         ),
+        GameInput::ToggleChat => (ctx.chat_visible, true),
         GameInput::ToggleWield => (ctx.wielding, ready),
         GameInput::Block => (false, still && ctx.wielding),
         GameInput::Glide => (ctx.gliding, ready && glider && !ctx.trading),
@@ -195,7 +197,6 @@ const D_MENU: f32 = 0.085;
 /// Rows, as fractions of the screen height measured from the top.
 const ROW_MENU: f32 = 0.055;
 const ROW_SLOT: f32 = 0.175;
-const ROW_CHAT: f32 = 0.27;
 const ROW_HIGH: f32 = 0.395;
 const ROW_MID: f32 = 0.585;
 const ROW_LOW: f32 = 0.80;
@@ -234,11 +235,9 @@ const PANEL_SPACING_MAX: f32 = 0.30;
 /// Smallest a grid button shrinks to. Only reached in windows narrower than
 /// anything the Android build can be given.
 const PANEL_D_MIN: f32 = 0.06;
-/// First row of the standard grid; keep it below the chat toggle under More.
-const PANEL_ROW_TOP: f32 = 0.405;
-/// Compact grids have smaller buttons and need less clearance from the chat
-/// toggle.
-const NARROW_PANEL_ROW_TOP: f32 = 0.37;
+/// First row of the grid, how far down it may reach, and the row pitch it
+/// prefers when there is room for it.
+const PANEL_ROW_TOP: f32 = 0.32;
 /// Leave a clear strip above the game's centered bottom hotbar.
 const PANEL_ROW_BOTTOM: f32 = 0.85;
 const PANEL_ROW_PITCH: f32 = 0.16;
@@ -249,7 +248,7 @@ const TIER_ROWS: [f32; TIER_SLOTS] = [ROW_LOW, ROW_MID, ROW_HIGH];
 
 /// Number of context actions; the array in [`layout`] must match. The grid
 /// shapes itself around this, so it is not tied to a row count.
-pub const CONTEXT_SLOTS: usize = 15;
+pub const CONTEXT_SLOTS: usize = 16;
 /// Expanded-grid entries after the first [`TIER_SLOTS`] actions stay anchored.
 const EXPANDED_GRID_SLOTS: usize = CONTEXT_SLOTS - TIER_SLOTS;
 /// Below this aspect ratio the expanded grid uses two vertical lanes rather
@@ -300,7 +299,7 @@ struct Fixed {
 }
 
 /// Fixed-position buttons, in rows from the top of the screen down.
-const FIXED: [Fixed; 15] = [
+const FIXED: [Fixed; 14] = [
     // Menu row. Settings is left out on purpose: the menu button opens the
     // escape menu, which has it.
     Fixed {
@@ -378,15 +377,6 @@ const FIXED: [Fixed; 15] = [
         side: Side::Left,
         lane: 0.58,
         row: ROW_MENU,
-        diameter: D_MENU,
-    },
-    // Chat is hidden by default on phones; keep its toggle directly below More.
-    Fixed {
-        action: Some(Kind::Input(GameInput::ToggleChat)),
-        label: Label::Key("hud-touch-chat"),
-        side: Side::Left,
-        lane: 0.58,
-        row: ROW_CHAT,
         diameter: D_MENU,
     },
     // Combat cluster: the attack button on the edge lane, the rest around it.
@@ -568,10 +558,10 @@ fn context_slot(slot: usize, expanded: bool, aspect: f32, grid_slots: usize) -> 
             1 => context_center + D_SMALL / 2.0 + diameter / 2.0 + PANEL_MARGIN,
             _ => return None,
         };
-        let row_pitch = (PANEL_ROW_BOTTOM - NARROW_PANEL_ROW_TOP) / (rows - 1).max(1) as f32;
+        let row_pitch = (PANEL_ROW_BOTTOM - PANEL_ROW_TOP) / (rows - 1).max(1) as f32;
         return Some(Placement {
             lane: aspect - from_left,
-            row: NARROW_PANEL_ROW_TOP + row as f32 * row_pitch,
+            row: PANEL_ROW_TOP + row as f32 * row_pitch,
             diameter,
         });
     }
@@ -609,17 +599,14 @@ pub fn shown(
         });
     }
     for (offset, button) in FIXED.iter().enumerate() {
-        // Death leaves menu access and the dedicated respawn control; hide
-        // movement, hotbar, context and combat controls.
+        // Death leaves menu access, More for chat, and the dedicated respawn
+        // control; hide movement, hotbar, gameplay and combat controls.
         if ctx.dead
             && !matches!(
                 button.action,
                 Some(Kind::Input(
-                    GameInput::Inventory
-                        | GameInput::Diary
-                        | GameInput::Escape
-                        | GameInput::ToggleChat
-                ))
+                    GameInput::Inventory | GameInput::Diary | GameInput::Escape
+                )) | Some(Kind::More)
             )
         {
             continue;
@@ -650,11 +637,7 @@ pub fn shown(
                 Label::Symbol(symbol) => symbol.to_owned(),
                 Label::Toggle { closed, open } => localize(if expanded { open } else { closed }),
             },
-            active: match button.action {
-                Some(Kind::More) => expanded,
-                Some(Kind::Input(GameInput::ToggleChat)) => ctx.chat_visible,
-                _ => false,
-            },
+            active: matches!(button.action, Some(Kind::More)) && expanded,
         });
     }
     // The most-used actions keep the same three positions whether More is
@@ -665,7 +648,12 @@ pub fn shown(
         if !spec.enabled {
             continue;
         }
-        let placement = if !expanded {
+        let placement = if spec.kind == Kind::Input(GameInput::ToggleChat) {
+            if !expanded {
+                continue;
+            }
+            context_slot(0, true, aspect, EXPANDED_GRID_SLOTS)
+        } else if !expanded {
             if tier_slot >= TIER_SLOTS {
                 continue;
             }
@@ -779,7 +767,7 @@ mod tests {
         }
     }
 
-    /// The state the player is in after dying: only menus and respawn remain.
+    /// The state the player is in after dying: menus and More remain for Chat.
     fn dead_context() -> Context {
         Context {
             dead: true,
@@ -1013,28 +1001,44 @@ mod tests {
     }
 
     #[test]
-    fn chat_toggle_stays_below_more_and_tracks_visibility() {
+    fn chat_toggle_only_appears_in_the_expanded_grid() {
         let mut ctx = full_context();
         let closed = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
-        let more = closed
-            .iter()
-            .find(|button| matches!(button.action, Some(Kind::More)))
-            .expect("expected More button");
-        let chat = input_button(&closed, GameInput::ToggleChat);
-        assert_eq!(chat.center.x, more.center.x);
-        assert!(chat.center.y > more.center.y);
+        assert!(!has_input(&closed, GameInput::ToggleChat));
+
+        let expanded = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        let chat = input_button(&expanded, GameInput::ToggleChat);
+        let first_grid_slot = context_slot(0, true, 16.0 / 9.0, EXPANDED_GRID_SLOTS)
+            .expect("first expanded-grid slot");
+        assert_eq!(
+            chat.center,
+            center_of(
+                Side::Right,
+                first_grid_slot.lane,
+                first_grid_slot.row,
+                16.0 / 9.0,
+            ),
+        );
         assert_eq!(chat.label, "hud-touch-chat");
         assert!(!chat.active);
 
-        let expanded = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        // It stays in the grid even when the usual nearby actions are absent.
+        ctx.has_mount_target = false;
+        ctx.has_trade_target = false;
+        ctx.has_stay_follow_target = false;
+        let no_targets = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
         assert_eq!(
-            input_button(&expanded, GameInput::ToggleChat).center,
+            input_button(&no_targets, GameInput::ToggleChat).center,
             chat.center
         );
 
         ctx.chat_visible = true;
-        let visible = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
+        let visible = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
         assert!(input_button(&visible, GameInput::ToggleChat).active);
+        assert!(!has_input(
+            &shown(&ctx, false, 16.0 / 9.0, str::to_owned),
+            GameInput::ToggleChat,
+        ));
     }
 
     #[test]
@@ -1081,7 +1085,6 @@ mod tests {
             GameInput::Slot3,
             GameInput::Slot4,
             GameInput::Slot5,
-            GameInput::ToggleChat,
         ] {
             assert!(clear_of_minimap(input), "{input:?} overlaps the minimap");
         }
@@ -1159,14 +1162,19 @@ mod tests {
             .iter()
             .any(|region| matches!(region.action, Kind::Input(GameInput::Respawn)));
         assert!(tappable, "the respawn button has no region to tap");
-        // Keep menus and the chat toggle, but hide the movement stick, hotbar,
-        // context actions and combat cluster while dead.
+        // Keep menus and More (to reach Chat), but hide the movement stick,
+        // hotbar, gameplay actions and combat cluster while dead.
         assert_eq!(
             drawn.len(),
             5,
-            "dead HUD should only have menus, chat and respawn"
+            "dead HUD should keep menus, More and respawn"
         );
-        assert!(has_input(&drawn, GameInput::ToggleChat));
+        assert!(!has_input(&drawn, GameInput::ToggleChat));
+        assert!(drawn.iter().any(|button| matches!(button.action, Some(Kind::More))));
+        assert!(has_input(
+            &shown(&dead_context(), true, 16.0 / 9.0, str::to_owned),
+            GameInput::ToggleChat,
+        ));
         for input in [GameInput::Inventory, GameInput::Diary, GameInput::Escape] {
             assert!(
                 has_input(&drawn, input),
@@ -1182,12 +1190,6 @@ mod tests {
         ] {
             assert!(!has_input(&drawn, input), "dead HUD still offers {input:?}");
         }
-        assert!(
-            !drawn
-                .iter()
-                .any(|button| matches!(button.action, Some(Kind::More))),
-            "More should be hidden when no context actions are available",
-        );
     }
 
     #[test]
