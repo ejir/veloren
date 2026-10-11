@@ -3334,7 +3334,7 @@ impl Hud {
         let msm = ecs.read_resource::<MaterialStatManifest>();
         let time = ecs.read_resource::<Time>();
 
-        if global_state.settings.interface.toggle_hotkey_hints {
+        if global_state.settings.interface.toggle_hotkey_hints && !cfg!(target_os = "android") {
             // Action text in bottom right corner
             DynamicTutorial::new(global_state, client, &self.fonts, &self.imgs, i18n)
                 .set(self.ids.buttons, ui_widgets);

@@ -571,6 +571,12 @@ impl Widget for Tutorial<'_> {
         self.global_state.profile.tutorial.update(self.dt);
         self.global_state.profile.tutorial.event_tick(self.client);
 
+        // Touch controls replace keyboard/controller instructions on Android;
+        // keep tutorial progression running without showing its hint toasts.
+        if cfg!(target_os = "android") {
+            return;
+        }
+
         let mut old = Vec::new();
         // TODO: Decide on whether viewing achievements is desirable after play-testing
         if tweak!(false) && self.esc_menu {
