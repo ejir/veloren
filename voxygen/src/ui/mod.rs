@@ -339,7 +339,12 @@ impl Ui {
                     },
                 };
 
-                self.ui.handle_event(Input::Touch(touch));
+                // Once a finger is scrolling, its movement belongs to the
+                // swipe rather than to the widget under it, which must not
+                // follow the finger as if it were being dragged.
+                if scroll_delta.is_none() {
+                    self.ui.handle_event(Input::Touch(touch));
+                }
                 if let Some(delta) = scroll_delta {
                     // Conrod scrollables listen for mouse-wheel motion. Keep the
                     // virtual pointer at the finger and feed them the incremental

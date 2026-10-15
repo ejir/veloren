@@ -1,7 +1,8 @@
 //! A widget for selecting a single value along some linear range.
 use conrod_core::{
     Color, Colorable, Positionable, Rect, Sizeable, Widget, WidgetCommon, builder_methods, image,
-    position::Range,
+    input::touch::Phase,
+    position::{Point, Range},
     utils,
     widget::{self, Image},
     widget_ids,
@@ -202,28 +203,54 @@ where
 
         let is_horizontal = rect.w() > rect.h();
 
+        // Touch screens have no mouse, so the slider also follows a finger
+        // that is on it: a drag follows the finger and a tap picks the
+        // tapped position on release. Swipes, which scroll the page the
+        // slider sits on, are cancelled before they reach the widget, so a
+        // touch that is still delivered here belongs to the slider. Where a
+        // touch begins is deliberately ignored: it is not known yet whether
+        // the finger will tap the slider or swipe the page, and the latter
+        // must not change the value. Conrod reports touch positions relative
+        // to the centre of the widget, so add the centre back to get absolute
+        // coordinates.
+        let touch_abs_xy = {
+            let input = ui.widget_input(id);
+            let center = rect.xy();
+            let mut abs_xy = None;
+            for event in input.events() {
+                if let conrod_core::event::Widget::Touch(touch) = event
+                    && matches!(touch.phase, Phase::Move | Phase::End)
+                {
+                    abs_xy = Some([center[0] + touch.xy[0], center[1] + touch.xy[1]]);
+                }
+            }
+            abs_xy
+        };
+
+        // The value a position in absolute coordinates points at.
+        let value_from_abs_xy = |abs_xy: Point| {
+            let (offset, dim) = if is_horizontal {
+                // Horizontal
+                (abs_xy[0] - rect.x.start, rect.w())
+            } else {
+                // Vertical
+                (abs_xy[1] - rect.y.start, rect.h())
+            };
+            let offset = offset - start_pad;
+            let track_length = dim - start_pad - end_pad;
+            let perc = utils::clamp(offset, 0.0, track_length) / track_length;
+            let skewed_perc = (perc).powf(skew as f64);
+            K::value_from_percent(skewed_perc as f32, min, max)
+        };
+
         let new_value = if let Some(mouse) = ui.widget_input(id).mouse() {
             if mouse.buttons.left().is_down() {
-                let mouse_abs_xy = mouse.abs_xy();
-                let (mouse_offset, track_length) = if is_horizontal {
-                    // Horizontal
-                    (
-                        mouse_abs_xy[0] - rect.x.start - start_pad,
-                        rect.w() - start_pad - end_pad,
-                    )
-                } else {
-                    // Vertical
-                    (
-                        mouse_abs_xy[1] - rect.y.start - start_pad,
-                        rect.h() - start_pad - end_pad,
-                    )
-                };
-                let perc = utils::clamp(mouse_offset, 0.0, track_length) / track_length;
-                let skewed_perc = (perc).powf(skew as f64);
-                K::value_from_percent(skewed_perc as f32, min, max)
+                value_from_abs_xy(mouse.abs_xy())
             } else {
                 value
             }
+        } else if let Some(abs_xy) = touch_abs_xy {
+            value_from_abs_xy(abs_xy)
         } else {
             value
         };
@@ -253,20 +280,22 @@ where
             .set(state.ids.track, ui);
 
         // Slider
-        let slider_image = ui
+        // A finger dragging the slider or lifting off it presses the slider,
+        // just like the mouse's left button does.
+        let mouse_down = ui
             .widget_input(id)
             .mouse()
-            .map(|mouse| {
-                if mouse.buttons.left().is_down() {
-                    slider
-                        .press_image_id
-                        .or(slider.hover_image_id)
-                        .unwrap_or(slider.image_id)
-                } else {
-                    slider.hover_image_id.unwrap_or(slider.image_id)
-                }
-            })
-            .unwrap_or(slider.image_id);
+            .is_some_and(|mouse| mouse.buttons.left().is_down());
+        let slider_image = if mouse_down || touch_abs_xy.is_some() {
+            slider
+                .press_image_id
+                .or(slider.hover_image_id)
+                .unwrap_or(slider.image_id)
+        } else if ui.widget_input(id).mouse().is_some() {
+            slider.hover_image_id.unwrap_or(slider.image_id)
+        } else {
+            slider.image_id
+        };
 
         // A rectangle for positioning and sizing the slider.
         let slider_rect = |slider_value| {

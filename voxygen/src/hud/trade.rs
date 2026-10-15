@@ -86,6 +86,10 @@ widget_ids! {
         amount_open_ovlay,
         amount_input,
         amount_btn,
+        amount_minus_ten_btn,
+        amount_minus_btn,
+        amount_plus_btn,
+        amount_plus_ten_btn,
         trade_details_btn,
     }
 }
@@ -727,6 +731,20 @@ impl<'a> Trade<'a> {
         trade: &'a PendingTrade,
     ) -> Option<TradeEvent> {
         let mut event = None;
+        let mut trade_action = None;
+        // A phone cannot open a keyboard for the amount text edit, so it gets
+        // tap-based steppers instead. `cfg!` rather than a `#[cfg]` attribute,
+        // so that the stepper code is compiled, and therefore checked,
+        // everywhere.
+        let touch_amount = cfg!(target_os = "android");
+        // Touch targets have to be much bigger than the desktop text field, so
+        // the panel grows; it still fits below the accept and decline buttons
+        // and below the text saying that a player has accepted the trade.
+        let (amount_width, amount_height) = if touch_amount {
+            (288.0, 56.0)
+        } else {
+            (132.0, 20.0)
+        };
         let selected = self.slot_manager.selected().and_then(|s| match s {
             SlotKind::Trade(t_s) => t_s.invslot.and_then(|slot| {
                 let who: usize = trade.offers[0].get(&slot).and(Some(0)).unwrap_or(1);
@@ -738,7 +756,7 @@ impl<'a> Trade<'a> {
             }),
             _ => None,
         });
-        Rectangle::fill([132.0, 20.0])
+        Rectangle::fill([amount_width, amount_height])
             .bottom_right_with_margins_on(state.ids.bg_frame, 16.0, 32.0)
             .hsla(
                 0.0,
@@ -758,29 +776,127 @@ impl<'a> Trade<'a> {
                 .get(&slot)
                 .map(|u| format!("{}", u))
                 .unwrap_or_else(String::new);
-            Text::new(&input)
-                .top_left_with_margins_on(state.ids.amount_bg, 0.0, 22.0)
-                .font_id(self.fonts.cyri.conrod_id)
-                .font_size(self.fonts.cyri.scale(14))
-                .color(TEXT_COLOR.alpha(0.7))
-                .set(state.ids.amount_open_label, ui);
-            if Button::image(self.imgs.edit_btn)
-                .hover_image(self.imgs.edit_btn_hover)
-                .press_image(self.imgs.edit_btn_press)
-                .mid_left_with_margin_on(state.ids.amount_bg, 2.0)
-                .w_h(16.0, 16.0)
-                .set(state.ids.amount_open_btn, ui)
-                .was_clicked()
-            {
-                event = Some(HudUpdate::Focus(state.ids.amount_input));
-                self.slot_manager.idle();
-                self.show.trade_amount_input_key =
-                    Some(TradeAmountInput::new(slot, input, inv, ours, who));
+            if touch_amount {
+                // The amount currently offered, between the steppers.
+                Text::new(&input)
+                    .middle_of(state.ids.amount_bg)
+                    .font_id(self.fonts.cyri.conrod_id)
+                    .font_size(self.fonts.cyri.scale(22))
+                    .color(TEXT_COLOR.alpha(0.7))
+                    .set(state.ids.amount_open_label, ui);
+                // Step the offer by one item per tap, or ten with the outer
+                // buttons. Like the text edit on desktop, the amount stays
+                // within the inventory the offer comes from.
+                let offered = trade.offers[who].get(&slot).copied().unwrap_or(0) as i32;
+                let can_remove = offered > 0;
+                let can_add = offered < inv as i32;
+                // Fade out the buttons that cannot do anything, so that it is
+                // clear in which direction the amount can still be changed.
+                let add_color = Color::Rgba(1.0, 1.0, 1.0, if can_add { 1.0 } else { 0.4 });
+                let remove_color = Color::Rgba(1.0, 1.0, 1.0, if can_remove { 1.0 } else { 0.4 });
+                let mut amount_step = 0;
+                // Anchored buttons first, so that the ones placed next to them
+                // always have a widget to sit beside.
+                if Button::image(self.imgs.button)
+                    .hover_image(self.imgs.button_hover)
+                    .press_image(self.imgs.button_press)
+                    .w_h(48.0, 48.0)
+                    .mid_right_with_margin_on(state.ids.amount_bg, 8.0)
+                    .label("+10")
+                    .label_font_size(self.fonts.cyri.scale(20))
+                    .label_font_id(self.fonts.cyri.conrod_id)
+                    .label_color(TEXT_COLOR)
+                    .label_y(Relative::Scalar(2.0))
+                    .image_color(add_color)
+                    .enabled(can_add)
+                    .set(state.ids.amount_plus_ten_btn, ui)
+                    .was_clicked()
+                    && can_add
+                {
+                    amount_step = (inv as i32 - offered).min(10);
+                }
+                if Button::image(self.imgs.button)
+                    .hover_image(self.imgs.button_hover)
+                    .press_image(self.imgs.button_press)
+                    .w_h(48.0, 48.0)
+                    .left_from(state.ids.amount_plus_ten_btn, 4.0)
+                    .label("+1")
+                    .label_font_size(self.fonts.cyri.scale(20))
+                    .label_font_id(self.fonts.cyri.conrod_id)
+                    .label_color(TEXT_COLOR)
+                    .label_y(Relative::Scalar(2.0))
+                    .image_color(add_color)
+                    .enabled(can_add)
+                    .set(state.ids.amount_plus_btn, ui)
+                    .was_clicked()
+                    && can_add
+                {
+                    amount_step = 1;
+                }
+                if Button::image(self.imgs.button)
+                    .hover_image(self.imgs.button_hover)
+                    .press_image(self.imgs.button_press)
+                    .w_h(48.0, 48.0)
+                    .mid_left_with_margin_on(state.ids.amount_bg, 8.0)
+                    .label("-10")
+                    .label_font_size(self.fonts.cyri.scale(20))
+                    .label_font_id(self.fonts.cyri.conrod_id)
+                    .label_color(TEXT_COLOR)
+                    .label_y(Relative::Scalar(2.0))
+                    .image_color(remove_color)
+                    .enabled(can_remove)
+                    .set(state.ids.amount_minus_ten_btn, ui)
+                    .was_clicked()
+                    && can_remove
+                {
+                    amount_step = -(offered.min(10));
+                }
+                if Button::image(self.imgs.button)
+                    .hover_image(self.imgs.button_hover)
+                    .press_image(self.imgs.button_press)
+                    .w_h(48.0, 48.0)
+                    .right_from(state.ids.amount_minus_ten_btn, 4.0)
+                    .label("-1")
+                    .label_font_size(self.fonts.cyri.scale(20))
+                    .label_font_id(self.fonts.cyri.conrod_id)
+                    .label_color(TEXT_COLOR)
+                    .label_y(Relative::Scalar(2.0))
+                    .image_color(remove_color)
+                    .enabled(can_remove)
+                    .set(state.ids.amount_minus_btn, ui)
+                    .was_clicked()
+                    && can_remove
+                {
+                    amount_step = -1;
+                }
+                if amount_step != 0 {
+                    trade_action = TradeAction::item(slot, amount_step, ours);
+                }
+            } else {
+                Text::new(&input)
+                    .top_left_with_margins_on(state.ids.amount_bg, 0.0, 22.0)
+                    .font_id(self.fonts.cyri.conrod_id)
+                    .font_size(self.fonts.cyri.scale(14))
+                    .color(TEXT_COLOR.alpha(0.7))
+                    .set(state.ids.amount_open_label, ui);
+                if Button::image(self.imgs.edit_btn)
+                    .hover_image(self.imgs.edit_btn_hover)
+                    .press_image(self.imgs.edit_btn_press)
+                    .mid_left_with_margin_on(state.ids.amount_bg, 2.0)
+                    .w_h(16.0, 16.0)
+                    .set(state.ids.amount_open_btn, ui)
+                    .was_clicked()
+                {
+                    event = Some(HudUpdate::Focus(state.ids.amount_input));
+                    self.slot_manager.idle();
+                    self.show.trade_amount_input_key =
+                        Some(TradeAmountInput::new(slot, input, inv, ours, who));
+                }
+                Rectangle::fill_with([132.0, 20.0], color::TRANSPARENT)
+                    .top_left_of(state.ids.amount_bg)
+                    .graphics_for(state.ids.amount_open_btn)
+                    .set(state.ids.amount_open_ovlay, ui);
             }
-            Rectangle::fill_with([132.0, 20.0], color::TRANSPARENT)
-                .top_left_of(state.ids.amount_bg)
-                .graphics_for(state.ids.amount_open_btn)
-                .set(state.ids.amount_open_ovlay, ui);
         } else if let Some(key) = &mut self.show.trade_amount_input_key {
             if !Hud::is_captured::<TextEdit>(ui) && key.input_painted {
                 // If the text edit is not captured submit the amount.
@@ -842,6 +958,9 @@ impl<'a> Trade<'a> {
                 .font_size(self.fonts.cyri.scale(14))
                 .color(TEXT_GRAY_COLOR.alpha(0.25))
                 .set(state.ids.amount_notice, ui);
+        }
+        if let Some(action) = trade_action {
+            return Some(TradeEvent::TradeAction(action));
         }
         event.map(TradeEvent::HudUpdate)
     }
