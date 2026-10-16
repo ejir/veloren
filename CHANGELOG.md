@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Toggle for the biome change popup
 - Overlay tint when game is paused
 - Sfx priority system; more important sfx can override less important ones
+- Added a "Remember password" option to the menu for securely storing login credentials on Linux
 
 ### Changed
 
@@ -63,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved LoD voxel effect
 - Improved dual wielding animations
 - Complete inventory/bag redesign
+- Login UI now only asks for username and credentials when server asks for it
 
 ### Removed
 
