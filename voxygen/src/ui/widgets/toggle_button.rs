@@ -112,7 +112,13 @@ impl Widget for ToggleButton {
         // (Can't use `.set().was_clicked()` because we are changing the image after
         // setting the widget, which causes flickering since it takes a frame to
         // change after the mouse button is lifted).
-        if ui.widget_input(state.ids.button).clicks().left().count() % 2 == 1 {
+        // Touch screens report taps instead of mouse clicks, so count both,
+        // like conrod's own toggle widget does.
+        let times_clicked = {
+            let input = ui.widget_input(state.ids.button);
+            input.clicks().left().count() + input.taps().count()
+        };
+        if times_clicked % 2 == 1 {
             value = !value;
         }
         let image = if value { t_image } else { f_image };

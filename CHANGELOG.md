@@ -70,6 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- On touch screens, settings sliders and checkboxes now respond to taps and finger drags instead of only to a mouse.
+- On Android, the amount of items offered in a trade can now be changed with on-screen steppers, since the amount text field needs a keyboard.
 - On Android, the screen no longer turns black (only music keeps playing) after switching away from the game and back.
 - The "create new character" button is always shown below the character list, instead of possibly being scrolled out of view or hidden on small screens.
 - Touch screens can now swipe the main menu lists (such as the language selection), and lifting the finger at the end of a swipe no longer selects the button underneath.
