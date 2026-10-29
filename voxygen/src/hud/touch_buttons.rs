@@ -104,6 +104,8 @@ const ACTIONS: [(GameInput, &str); CONTEXT_SLOTS] = [
     (GameInput::Trade, "hud-trade"),
     (GameInput::StayFollow, "hud-stay"),
     (GameInput::ToggleChat, "hud-touch-chat"),
+    (GameInput::Map, "hud-touch-map"),
+    (GameInput::SwapLoadout, "hud-touch-swap"),
     (GameInput::ToggleWield, "hud-touch-draw"),
     (GameInput::Block, "hud-touch-block"),
     (GameInput::ToggleLantern, "hud-touch-lantern"),
@@ -166,6 +168,8 @@ fn state_of(ctx: &Context, input: GameInput) -> (bool, bool) {
             ctx.controlling && !ctx.dead && ctx.has_stay_follow_target,
         ),
         GameInput::ToggleChat => (ctx.chat_visible, true),
+        GameInput::Map => (false, true),
+        GameInput::SwapLoadout => (false, ready),
         GameInput::ToggleWield => (ctx.wielding, ready),
         GameInput::Block => (false, still && ctx.wielding),
         GameInput::Glide => (ctx.gliding, ready && glider && !ctx.trading),
@@ -248,7 +252,7 @@ const TIER_ROWS: [f32; TIER_SLOTS] = [ROW_LOW, ROW_MID, ROW_HIGH];
 
 /// Number of context actions; the array in [`layout`] must match. The grid
 /// shapes itself around this, so it is not tied to a row count.
-pub const CONTEXT_SLOTS: usize = 16;
+pub const CONTEXT_SLOTS: usize = 18;
 /// Expanded-grid entries after the first [`TIER_SLOTS`] actions stay anchored.
 const EXPANDED_GRID_SLOTS: usize = CONTEXT_SLOTS - TIER_SLOTS;
 /// Below this aspect ratio the expanded grid uses two vertical lanes rather
@@ -831,6 +835,20 @@ mod tests {
             .iter()
             .find(|button| matches!(button.action, Some(Kind::Input(action)) if action == input))
             .unwrap_or_else(|| panic!("missing {input:?} button"))
+    }
+
+    #[test]
+    fn map_and_weapon_swap_are_available_on_touch() {
+        let ctx = full_context();
+        let buttons = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        for input in [GameInput::Map, GameInput::SwapLoadout] {
+            assert!(has_input(&buttons, input));
+            assert!(regions(&buttons).iter().any(|region| region.action == Kind::Input(input)));
+        }
+        let dead = Context { dead: true, ..ctx };
+        let buttons = shown(&dead, true, 16.0 / 9.0, str::to_owned);
+        assert!(has_input(&buttons, GameInput::Map));
+        assert!(!has_input(&buttons, GameInput::SwapLoadout));
     }
 
     #[test]

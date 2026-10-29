@@ -145,6 +145,8 @@ pub enum Event<K> {
 // Handles interactions with slots
 pub struct SlotManager<S: SumSlot> {
     state: ManagerState<S>,
+    /// One-shot touch equivalent of Ctrl/Shift-click in the trade window.
+    touch_request: Option<bool>,
     // Rebuilt every frame
     slot_ids: Vec<widget::Id>,
     // Rebuilt every frame
@@ -198,6 +200,7 @@ where
     ) -> Self {
         Self {
             state: ManagerState::Idle,
+            touch_request: None,
             slot_ids: Vec::new(),
             slots: Vec::new(),
             events: Vec::new(),
@@ -335,6 +338,13 @@ where
         self.prefix_switch_point = prefix_switch_point;
     }
 
+    pub fn touch_request(&self) -> Option<bool> { self.touch_request }
+
+    pub fn set_touch_request(&mut self, request: Option<bool>) {
+        self.touch_request = request;
+        self.state = ManagerState::Idle;
+    }
+
     fn update(
         &mut self,
         widget: widget::Id,
@@ -373,7 +383,15 @@ where
         let click_count = input.clicks().left().count();
         let tap_count = input.taps().count();
         let interaction_count = click_count + tap_count;
-        if interaction_count > 0 {
+        let touch_request = if tap_count > 0 && filled {
+            self.touch_request.take()
+        } else {
+            None
+        };
+        if let Some(auto_quantity) = touch_request {
+            self.events.push(Event::Request { slot, auto_quantity });
+            self.state = ManagerState::Idle;
+        } else if interaction_count > 0 {
             self.state = if let ManagerState::Selected(id, other_slot) = self.state {
                 if id != widget {
                     // A tap on a second slot is the touch-friendly equivalent

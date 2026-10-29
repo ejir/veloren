@@ -91,6 +91,8 @@ widget_ids! {
         amount_plus_btn,
         amount_plus_ten_btn,
         trade_details_btn,
+        touch_stack_btn,
+        touch_single_btn,
     }
 }
 
@@ -1035,6 +1037,32 @@ impl Widget for Trade<'_> {
 
         self.background(state, ui);
         self.title(state, ui);
+        // A tap selects a one-shot modifier; the next item tap performs the
+        // same request as a Ctrl- or Shift-click without requiring multitouch.
+        #[cfg(target_os = "android")]
+        {
+            for (id, label, quantity, x) in [
+                (state.ids.touch_stack_btn, "Ctrl", true, 110.0),
+                (state.ids.touch_single_btn, "Shift", false, 220.0),
+            ] {
+                let input = ui.widget_input(id);
+                let tapped = input.clicks().left().count() + input.taps().count() > 0;
+                if tapped {
+                    let next = (self.slot_manager.touch_request() != Some(quantity))
+                        .then_some(quantity);
+                    self.slot_manager.set_touch_request(next);
+                }
+                let active = self.slot_manager.touch_request() == Some(quantity);
+                Button::image(if active { self.imgs.button_press } else { self.imgs.button })
+                    .w_h(100.0, 28.0)
+                    .bottom_left_with_margins_on(state.ids.bg, -36.0, x)
+                    .label(label)
+                    .label_font_size(self.fonts.cyri.scale(14))
+                    .label_color(TEXT_COLOR)
+                    .label_font_id(self.fonts.cyri.conrod_id)
+                    .set(id, ui);
+            }
+        }
         self.phase_indicator(state, ui, trade);
 
         if let Some(event_list) = self.item_pane(state, ui, trade, prices, false) {
