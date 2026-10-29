@@ -147,3 +147,6 @@ hud-touch-respawn = 重生
 hud-touch-more = 更多
 hud-touch-less = 收起
 hud-touch-chat = 聊天
+
+hud-touch-map = 地图
+hud-touch-swap = 切换武器

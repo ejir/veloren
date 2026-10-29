@@ -147,3 +147,6 @@ hud-touch-respawn = Respawn
 hud-touch-more = More
 hud-touch-less = Less
 hud-touch-chat = Chat
+
+hud-touch-map = Map
+hud-touch-swap = Swap weapons

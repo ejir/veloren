@@ -3781,6 +3781,11 @@ impl Hud {
             }
         }
 
+        // Do not carry a touch trade modifier into another window or trade.
+        if !self.show.trade && self.slot_manager.touch_request().is_some() {
+            self.slot_manager.set_touch_request(None);
+        }
+
         // Trade window
         if self.show.trade {
             for event in Trade::new(
