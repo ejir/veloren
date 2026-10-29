@@ -652,11 +652,17 @@ pub fn shown(
         if !spec.enabled {
             continue;
         }
-        let placement = if spec.kind == Kind::Input(GameInput::ToggleChat) {
+        // These controls live in the expanded grid even when fewer than three
+        // nearby actions are available. In particular, the map must not occupy
+        // the bottom context slot where it could overlap the respawn button.
+        let placement = if matches!(
+            spec.kind,
+            Kind::Input(GameInput::ToggleChat | GameInput::Map | GameInput::SwapLoadout)
+        ) {
             if !expanded {
                 continue;
             }
-            context_slot(0, true, aspect, EXPANDED_GRID_SLOTS)
+            context_slot(spec.slot - TIER_SLOTS, true, aspect, EXPANDED_GRID_SLOTS)
         } else if !expanded {
             if tier_slot >= TIER_SLOTS {
                 continue;
@@ -841,7 +847,9 @@ mod tests {
     fn map_and_weapon_swap_are_available_on_touch() {
         let ctx = full_context();
         let buttons = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
+        let closed = shown(&ctx, false, 16.0 / 9.0, str::to_owned);
         for input in [GameInput::Map, GameInput::SwapLoadout] {
+            assert!(!has_input(&closed, input));
             assert!(has_input(&buttons, input));
             assert!(
                 regions(&buttons)
