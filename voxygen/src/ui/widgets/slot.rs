@@ -389,7 +389,10 @@ where
             None
         };
         if let Some(auto_quantity) = touch_request {
-            self.events.push(Event::Request { slot, auto_quantity });
+            self.events.push(Event::Request {
+                slot,
+                auto_quantity,
+            });
             self.state = ManagerState::Idle;
         } else if interaction_count > 0 {
             self.state = if let ManagerState::Selected(id, other_slot) = self.state {

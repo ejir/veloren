@@ -1048,19 +1048,23 @@ impl Widget for Trade<'_> {
                 let input = ui.widget_input(id);
                 let tapped = input.clicks().left().count() + input.taps().count() > 0;
                 if tapped {
-                    let next = (self.slot_manager.touch_request() != Some(quantity))
-                        .then_some(quantity);
+                    let next =
+                        (self.slot_manager.touch_request() != Some(quantity)).then_some(quantity);
                     self.slot_manager.set_touch_request(next);
                 }
                 let active = self.slot_manager.touch_request() == Some(quantity);
-                Button::image(if active { self.imgs.button_press } else { self.imgs.button })
-                    .w_h(100.0, 28.0)
-                    .bottom_left_with_margins_on(state.ids.bg, -36.0, x)
-                    .label(label)
-                    .label_font_size(self.fonts.cyri.scale(14))
-                    .label_color(TEXT_COLOR)
-                    .label_font_id(self.fonts.cyri.conrod_id)
-                    .set(id, ui);
+                Button::image(if active {
+                    self.imgs.button_press
+                } else {
+                    self.imgs.button
+                })
+                .w_h(100.0, 28.0)
+                .bottom_left_with_margins_on(state.ids.bg, -36.0, x)
+                .label(label)
+                .label_font_size(self.fonts.cyri.scale(14))
+                .label_color(TEXT_COLOR)
+                .label_font_id(self.fonts.cyri.conrod_id)
+                .set(id, ui);
             }
         }
         self.phase_indicator(state, ui, trade);

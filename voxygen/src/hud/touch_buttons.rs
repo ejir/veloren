@@ -843,7 +843,11 @@ mod tests {
         let buttons = shown(&ctx, true, 16.0 / 9.0, str::to_owned);
         for input in [GameInput::Map, GameInput::SwapLoadout] {
             assert!(has_input(&buttons, input));
-            assert!(regions(&buttons).iter().any(|region| region.action == Kind::Input(input)));
+            assert!(
+                regions(&buttons)
+                    .iter()
+                    .any(|region| region.action == Kind::Input(input))
+            );
         }
         let dead = Context { dead: true, ..ctx };
         let buttons = shown(&dead, true, 16.0 / 9.0, str::to_owned);
